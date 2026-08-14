@@ -1,14 +1,18 @@
 package com.symbanta.analytics.domain
 
+import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
-import java.math.BigDecimal
 
 @JvmInline
-value class PropertyId(val value: UUID)
+value class PropertyId(
+    val value: UUID,
+)
 
 @JvmInline
-value class EventId(val value: UUID)
+value class EventId(
+    val value: UUID,
+)
 
 data class AnalyticsEvent(
     val id: EventId = EventId(UUID.randomUUID()),
@@ -32,5 +36,10 @@ data class StatsSummary(
 
 interface AnalyticsRepository {
     fun saveEvent(event: AnalyticsEvent): EventId
-    fun getStatsSummary(domain: String, from: Instant, to: Instant): StatsSummary
+
+    fun getStatsSummary(
+        domain: String,
+        from: Instant,
+        to: Instant,
+    ): StatsSummary
 }

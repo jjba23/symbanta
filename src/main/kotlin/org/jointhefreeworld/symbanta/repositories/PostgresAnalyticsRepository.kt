@@ -16,7 +16,6 @@ import java.time.Instant
 class PostgresAnalyticsRepository(
     private val namedParameterJdbcTemplate: NamedParameterJdbcTemplate,
 ) : AnalyticsRepository {
-
     private val logger = KotlinLogging.logger {}
 
     private val statsSummaryRowMapper =
@@ -59,7 +58,11 @@ class PostgresAnalyticsRepository(
         }
 
     @Transactional(readOnly = true)
-    override fun getStatsSummary(domain: String, from: Instant, to: Instant): StatsSummary =
+    override fun getStatsSummary(
+        domain: String,
+        from: Instant,
+        to: Instant,
+    ): StatsSummary =
         withLoggingContext(
             "domain" to domain,
             "from" to from.toString(),
