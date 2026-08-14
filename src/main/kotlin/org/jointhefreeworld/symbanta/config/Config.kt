@@ -1,4 +1,4 @@
-package org.jointhefreeworld.symbanta
+package org.jointhefreeworld.symbanta.config
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

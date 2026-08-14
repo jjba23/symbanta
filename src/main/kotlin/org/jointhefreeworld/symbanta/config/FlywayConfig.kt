@@ -1,4 +1,4 @@
-package org.jointhefreeworld.symbanta
+package org.jointhefreeworld.symbanta.config
 
 import org.flywaydb.core.Flyway
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
