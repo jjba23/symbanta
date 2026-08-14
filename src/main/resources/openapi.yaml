@@ -64,8 +64,16 @@ paths:
           required: false
           schema:
             type: string
-            enum: [24h, 7d, 30d, 6m, 12m, custom]
-            default: 30d
+            enum:
+              [
+                LAST_24_HOURS,
+                LAST_7_DAYS,
+                LAST_30_DAYS,
+                LAST_6_MONTHS,
+                LAST_12_MONTHS,
+                CUSTOM,
+              ]
+            default: LAST_30_DAYS
           description: Time range for aggregated metrics.
         - name: start-date
           in: query
@@ -73,14 +81,14 @@ paths:
           schema:
             type: string
             format: date
-          description: Required if period is set to `custom` (YYYY-MM-DD).
+          description: Required if period is set to `CUSTOM` (YYYY-MM-DD).
         - name: end-date
           in: query
           required: false
           schema:
             type: string
             format: date
-          description: Required if period is set to `custom` (YYYY-MM-DD).
+          description: Required if period is set to `CUSTOM` (YYYY-MM-DD).
       responses:
         "200":
           description: Aggregated statistics retrieved successfully
@@ -198,4 +206,4 @@ components:
           format: uri-reference
           example: "/v1/events/register"
           description: A URI reference identifying the specific occurrence of the problem.
-      additionalProperties: true
+        additionalProperties: true
