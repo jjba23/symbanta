@@ -1,0 +1,20 @@
+spring:
+  main:
+    banner-mode: off
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: symbanta
+  datasource:
+    url: jdbc:postgresql://localhost:5432/app_db
+    username: postgres
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+
+management:
+  otlp:
+    metrics:
+      export:
+        enabled: false

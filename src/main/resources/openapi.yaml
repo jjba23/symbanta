@@ -1,4 +1,3 @@
----
 openapi: 3.0.3
 info:
   title: Symbanta API
@@ -7,7 +6,7 @@ info:
     Privacy-friendly, free, and open-source software analytics platform API.
     Designed to collect telemetry and usage metrics without storing Personally Identifiable Information (PII) or using persistent tracking cookies.
   contact:
-    name: Symbanta Support
+    name: Symbanta
 servers:
   - url: http://localhost:8080
     description: Local Server
@@ -37,23 +36,21 @@ paths:
         "400":
           description: Invalid payload or missing required fields
           content:
-            application/json:
+            application/problem+detail:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/V1ProblemDetails"
         "401":
           description: Unauthorized domain or token
           content:
-            application/json:
+            application/problem+detail:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/V1ProblemDetails"
 
   /v1/stats/summary:
     get:
       summary: Get aggregated site statistics
       description: Retrieve privacy-safe aggregated metrics (e.g., total visitors, views, bounce rate) for a given domain.
       operationId: getStatsSummary
-      security:
-        - BearerAuth: []
       parameters:
         - name: domain
           in: query
@@ -70,14 +67,14 @@ paths:
             enum: [24h, 7d, 30d, 6m, 12m, custom]
             default: 30d
           description: Time range for aggregated metrics.
-        - name: start_date
+        - name: start-date
           in: query
           required: false
           schema:
             type: string
             format: date
           description: Required if period is set to `custom` (YYYY-MM-DD).
-        - name: end_date
+        - name: end-date
           in: query
           required: false
           schema:
@@ -90,27 +87,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StatsSummaryResponse"
+                $ref: "#/components/schemas/V1StatsSummaryResponse"
         "401":
           description: Unauthorized dashboard access
           content:
-            application/json:
+            application/problem+detail:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/V1ProblemDetails"
 
 components:
-  securitySchemes:
-    DomainTokenAuth:
-      type: apiKey
-      in: header
-      name: X-Symbanta-Domain-Token
-      description: Public domain/site token used by frontend client SDKs.
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: Bearer token for authenticating admin/dashboard requests.
-
   schemas:
     V1EventPayload:
       type: object
@@ -124,8 +109,8 @@ components:
           description: Registered domain name.
         name:
           type: string
-          example: pageview
-          description: Name of the event (e.g., 'pageview', 'signup_click').
+          example: page-view
+          description: Name of the event (e.g., 'page-view', 'signup-click').
         url:
           type: string
           format: uri
@@ -136,10 +121,14 @@ components:
           format: uri
           example: https://google.com
           description: Referrer URL (if available).
-        screen_width:
+        screenWidth:
           type: integer
           example: 1920
           description: Screen/viewport width in pixels.
+        screenHeight:
+          type: integer
+          example: 1080
+          description: Screen/viewport height in pixels.
         language:
           type: string
           example: en-US
@@ -162,30 +151,54 @@ components:
           type: string
           example: Event queued successfully.
 
-    StatsSummaryResponse:
+    V1StatsSummaryResponse:
       type: object
       properties:
-        pageviews:
+        pageViews:
           type: integer
           example: 12450
         visitors:
           type: integer
           example: 3100
-        bounce_rate:
+        bounceRate:
           type: number
           format: float
           example: 42.5
           description: Percentage of single-page visits.
-        avg_duration_seconds:
-          type: integer
-          example: 184
+        averageDurationSeconds:
+          type: number
+          format: float
+          example: 1.84
 
-    ErrorResponse:
+    V1ProblemDetails:
       type: object
+      description: Standard RFC 7807 / RFC 9457 Problem Details response object.
+      required:
+        - type
+        - title
+        - status
       properties:
-        code:
+        type:
           type: string
-          example: INVALID_PAYLOAD
-        message:
+          format: uri-reference
+          default: "about:blank"
+          example: "https://api.symbanta.jointhefreeworld.org/v1/errors/invalid-payload"
+          description: A URI reference identifying the problem type.
+        title:
           type: string
-          example: The 'domain' field is required.
+          example: "Invalid Request Payload"
+          description: Short, human-readable summary of the problem type.
+        status:
+          type: integer
+          example: 400
+          description: The HTTP status code generated by the origin server.
+        detail:
+          type: string
+          example: "The 'domain' field is required and cannot be empty."
+          description: Human-readable explanation specific to this occurrence of the problem.
+        instance:
+          type: string
+          format: uri-reference
+          example: "/v1/events/register"
+          description: A URI reference identifying the specific occurrence of the problem.
+      additionalProperties: true
