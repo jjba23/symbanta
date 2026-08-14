@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RestController
 import java.time.LocalDate
 
 @RestController
-class StatsSummaryControllerImpl : V1StatsSummaryController {
+class V1StatsSummaryControllerImpl : V1StatsSummaryController {
     override fun getStatsSummary(
         domain: String,
         period: PeriodDto,
