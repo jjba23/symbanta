@@ -1,0 +1,11 @@
+root = true
+
+[*.{kt,kts}]
+indent_size = 4
+ktlint_code_style = ktlint_official
+ktlint_standard = enabled
+ktlint_standard_no-wildcard-imports = disabled
+
+[**/generated/**]
+generated_code = true
+ktlint = disabled

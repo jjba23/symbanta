@@ -1,0 +1,191 @@
+---
+openapi: 3.0.3
+info:
+  title: Symbanta API
+  version: 1.0.0
+  description: |
+    Privacy-friendly, free, and open-source software analytics platform API.
+    Designed to collect telemetry and usage metrics without storing Personally Identifiable Information (PII) or using persistent tracking cookies.
+  contact:
+    name: Symbanta Support
+servers:
+  - url: http://localhost:8080
+    description: Local Server
+  - url: https://api.symbanta.jointhefreeworld.org
+    description: Production Server
+
+paths:
+  /v1/events/register:
+    post:
+      summary: Register an event
+      description: |
+        Ingests a user event or pageview. Server-side processing automatically anonymizes request headers (e.g., IP addresses) and avoids persistent cookies.
+      operationId: registerEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/V1EventPayload"
+      responses:
+        "202":
+          description: Event successfully accepted and queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1EventResponse"
+        "400":
+          description: Invalid payload or missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized domain or token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/stats/summary:
+    get:
+      summary: Get aggregated site statistics
+      description: Retrieve privacy-safe aggregated metrics (e.g., total visitors, views, bounce rate) for a given domain.
+      operationId: getStatsSummary
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: domain
+          in: query
+          required: true
+          schema:
+            type: string
+          example: example.com
+          description: Registered domain name to fetch metrics for.
+        - name: period
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [24h, 7d, 30d, 6m, 12m, custom]
+            default: 30d
+          description: Time range for aggregated metrics.
+        - name: start_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Required if period is set to `custom` (YYYY-MM-DD).
+        - name: end_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Required if period is set to `custom` (YYYY-MM-DD).
+      responses:
+        "200":
+          description: Aggregated statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsSummaryResponse"
+        "401":
+          description: Unauthorized dashboard access
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  securitySchemes:
+    DomainTokenAuth:
+      type: apiKey
+      in: header
+      name: X-Symbanta-Domain-Token
+      description: Public domain/site token used by frontend client SDKs.
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token for authenticating admin/dashboard requests.
+
+  schemas:
+    V1EventPayload:
+      type: object
+      required:
+        - domain
+        - name
+      properties:
+        domain:
+          type: string
+          example: example.com
+          description: Registered domain name.
+        name:
+          type: string
+          example: pageview
+          description: Name of the event (e.g., 'pageview', 'signup_click').
+        url:
+          type: string
+          format: uri
+          example: https://example.com/blog/privacy-first
+          description: Full URL where the event occurred.
+        referrer:
+          type: string
+          format: uri
+          example: https://google.com
+          description: Referrer URL (if available).
+        screen_width:
+          type: integer
+          example: 1920
+          description: Screen/viewport width in pixels.
+        language:
+          type: string
+          example: en-US
+          description: Preferred browser language.
+        props:
+          type: object
+          additionalProperties: true
+          example:
+            plan: pro
+            theme: dark
+          description: Optional key-value metadata (custom properties). Must not contain PII.
+
+    V1EventResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        message:
+          type: string
+          example: Event queued successfully.
+
+    StatsSummaryResponse:
+      type: object
+      properties:
+        pageviews:
+          type: integer
+          example: 12450
+        visitors:
+          type: integer
+          example: 3100
+        bounce_rate:
+          type: number
+          format: float
+          example: 42.5
+          description: Percentage of single-page visits.
+        avg_duration_seconds:
+          type: integer
+          example: 184
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          example: INVALID_PAYLOAD
+        message:
+          type: string
+          example: The 'domain' field is required.

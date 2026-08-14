@@ -1,0 +1,48 @@
+version: "3.8"
+
+services:
+  mock-api:
+    image: "docker.io/wiremock/wiremock:3.5.2"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings
+    entrypoint: [ "/docker-entrypoint.sh", "--port=8000" ]
+
+  database:
+    image: "docker.io/postgres:17-alpine"
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_DB: app_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d app_db" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  application:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://database:5432/app_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres_password
+    ports:
+      - "8080:8080"
+    depends_on:
+      mock-api:
+        condition: service_started
+      database:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
