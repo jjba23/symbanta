@@ -6,6 +6,10 @@ default:
 # Development
 # ------------------------------------------------------------------------------
 
+# Compile project sources
+compile:
+    ./mvnw compile
+
 # Run the application locally
 run:
     ./mvnw spring-boot:run
