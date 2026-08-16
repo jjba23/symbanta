@@ -145,6 +145,10 @@ components:
           type: string
           example: en-US
           description: Preferred browser language.
+        userAgent:
+          type: string
+          example: Mozilla/110
+          description: Browser user agent
         props:
           type: object
           additionalProperties: true

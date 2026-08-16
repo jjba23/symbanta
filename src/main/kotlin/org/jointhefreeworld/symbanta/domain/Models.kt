@@ -11,7 +11,7 @@ value class PropertyId(
 
 @JvmInline
 value class SessionId(
-    val value: UUID,
+    val value: String,
 )
 
 @JvmInline
