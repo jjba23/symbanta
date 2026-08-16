@@ -53,6 +53,7 @@ class PostgresAnalyticsRepository(
                     .addValue("screenWidth", event.screenWidth)
                     .addValue("screenHeight", event.screenHeight)
                     .addValue("language", event.language)
+                    .addValue("userAgent", event.userAgent)
                     .addValue("props", event.propsJson)
                     .addValue("createdAt", Timestamp.from(event.createdAt))
 
@@ -111,6 +112,7 @@ class PostgresAnalyticsRepository(
                 screen_width,
                 screen_height,
                 language,
+                user_agent,
                 props,
                 created_at
             ) VALUES (
@@ -123,6 +125,7 @@ class PostgresAnalyticsRepository(
                 :screenWidth,
                 :screenHeight,
                 :language,
+                :userAgent,
                 :props::jsonb,
                 :createdAt
             )

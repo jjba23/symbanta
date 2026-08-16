@@ -1,50 +1,52 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Symbanta Telemetry Demo</title>
-  <script>
-    (function () {
-      const SYMBANTA_ENDPOINT = "http://localhost:8080/v1/events/register";
-      const DOMAIN_NAME = "example.com";
+    <meta charset="UTF-8">
+    <title>Symbanta Telemetry Demo</title>
+    <script>
+        (function () {
+            const SYMBANTA_ENDPOINT = "http://localhost:8080/v1/events/register";
+            const DOMAIN_NAME = "example.com";
 
-      // Get or create a session ID limited to current tab lifecycle
-      let sessionId = sessionStorage.getItem("symbanta_session_id");
-      if (!sessionId) {
-        sessionId = crypto.randomUUID();
-        sessionStorage.setItem("symbanta_session_id", sessionId);
-      }
+            // Get or create a session ID limited to current tab lifecycle
+            let sessionId = sessionStorage.getItem("symbanta_session_id");
+            if (!sessionId) {
+                sessionId = crypto.randomUUID();
+                sessionStorage.setItem("symbanta_session_id", sessionId);
+            }
 
-      // Construct EventPayload
-      const payload = {
-        domain: DOMAIN_NAME,
-        name: "page-view",
-        sessionId: sessionId,
-        url: window.location.href,
-        referrer: document.referrer || null,
-        screenWidth: window.screen.width,
-        screenHeight: window.screen.height,
-        language: navigator.language
-      };
+            // Construct EventPayload
+            const payload = {
+                domain: DOMAIN_NAME,
+                name: "page-view",
+                sessionId: sessionId,
+                userAgent: navigator.userAgent,
+                url: window.location.href,
+                referrer: document.referrer || null,
+                screenWidth: window.screen.width,
+                screenHeight: window.screen.height,
+                language: navigator.language
+            };
 
-      // Transmit payload using Blob to preserve application/json header with sendBeacon
-      const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
-      const queued = navigator.sendBeacon(SYMBANTA_ENDPOINT, blob);
+            // Transmit payload using Blob to preserve application/json header with sendBeacon
+            const blob = new Blob([JSON.stringify(payload)], {type: "application/json"});
+            const queued = navigator.sendBeacon(SYMBANTA_ENDPOINT, blob);
 
-      // Fallback to fetch if sendBeacon is unavailable or fails
-      if (!queued) {
-        fetch(SYMBANTA_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          keepalive: true
-        }).catch(() => {});
-      }
-    })();
-  </script>
+            // Fallback to fetch if sendBeacon is unavailable or fails
+            if (!queued) {
+                fetch(SYMBANTA_ENDPOINT, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify(payload),
+                    keepalive: true
+                }).catch(() => {
+                });
+            }
+        })();
+    </script>
 </head>
 <body>
-  <h1>Analytics Test Page</h1>
-  <p>A <code>page-view</code> event has been transmitted to Symbanta.</p>
+<h1>Analytics Test Page</h1>
+<p>A <code>page-view</code> event has been transmitted to Symbanta.</p>
 </body>
 </html>

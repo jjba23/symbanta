@@ -19,6 +19,8 @@
             nil
             just
             yaml-language-server
+            darkhttpd
+            watchexec
           ];
           JAVA_HOME = "${pkgs.jdk25}";
           shellHook = ''

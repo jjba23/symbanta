@@ -29,6 +29,7 @@ data class AnalyticsEvent(
     val screenWidth: Int?,
     val screenHeight: Int?,
     val language: String?,
+    val userAgent: String?,
     val propsJson: String,
     val createdAt: Instant,
 )

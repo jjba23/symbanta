@@ -21,6 +21,7 @@ CREATE TABLE events (
     screen_width INTEGER,
     screen_height INTEGER,
     language VARCHAR(32),
+    user_agent TEXT,
     props JSONB,
     created_at TIMESTAMPTZ NOT NULL
 );
@@ -35,6 +36,7 @@ COMMENT ON COLUMN events.referrer IS 'HTTP referrer URI originating the navigati
 COMMENT ON COLUMN events.screen_width IS 'Viewport or screen width in pixels.';
 COMMENT ON COLUMN events.screen_height IS 'Viewport or screen height in pixels.';
 COMMENT ON COLUMN events.language IS 'Preferred browser language header (e.g., en-US).';
+COMMENT ON COLUMN events.user_agent IS 'User agent string identifying the browser';
 COMMENT ON COLUMN events.props IS 'JSON map storing custom non-PII metadata properties passed with the payload.';
 COMMENT ON COLUMN events.created_at IS 'Timestamp (with time zone) when the event was recorded by the server.';
 

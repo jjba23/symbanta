@@ -66,5 +66,8 @@ down:
 # Dev Helpers and Local Tests
 # ------------------------------------------------------------------------------
 
+serve-examples:
+    darkhttpd ./examples --port 3001
+
 dev-get-summary:
     curl --verbose "http://localhost:8080/v1/stats/summary?domain=jointhefreeworld.org"
