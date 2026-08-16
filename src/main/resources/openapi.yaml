@@ -180,12 +180,12 @@ components:
           example: 3100
         bounceRate:
           type: number
-          format: float
+          format: long
           example: 42.5
           description: Percentage of single-page visits.
         averageDurationMillis:
           type: number
-          format: float
+          format: long
           example: 1.84
 
     V1ProblemDetails:

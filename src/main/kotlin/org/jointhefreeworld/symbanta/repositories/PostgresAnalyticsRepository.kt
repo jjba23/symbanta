@@ -25,7 +25,7 @@ class PostgresAnalyticsRepository(
                 pageViews = rs.getLong("page_views"),
                 visitors = rs.getLong("visitors"),
                 bounceRate = rs.getBigDecimal("bounce_rate"),
-                averageDurationMillis = rs.getDouble("avg_duration_ms"),
+                averageDurationMillis = rs.getBigDecimal("avg_duration_ms"),
             )
         }
 

@@ -45,5 +45,5 @@ data class StatsSummary(
     val pageViews: Long,
     val visitors: Long,
     val bounceRate: BigDecimal,
-    val averageDurationMillis: Double,
+    val averageDurationMillis: BigDecimal,
 )

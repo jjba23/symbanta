@@ -12,7 +12,7 @@ Instead of profiling individuals or building invasive cross-site identities, Sym
 INSERT INTO properties (id, domain, created_at)
 VALUES (
     gen_random_uuid(),
-    'jointhefreeworld.org',
+    'localhost',
     CURRENT_TIMESTAMP
 );
 #+end_src
