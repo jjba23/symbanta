@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Symbanta Analytics Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --border: #334155;
+      --error: #f87171;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 2rem;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      margin-bottom: 1.5rem;
+      font-size: 1.75rem;
+    }
+    .controls {
+      background: var(--card-bg);
+      padding: 1.5rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      align-items: end;
+      margin-bottom: 2rem;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    input, select, button {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.6rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    input:focus, select:focus {
+      outline: 1px solid var(--accent);
+    }
+    button {
+      background: var(--accent);
+      color: #0f172a;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      padding: 1.25rem;
+      border-radius: 8px;
+    }
+    .card .label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+    .card .value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .error {
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid var(--error);
+      color: var(--error);
+      padding: 1rem;
+      border-radius: 6px;
+      margin-bottom: 1.5rem;
+      display: none;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Symbanta Analytics</h1>
+
+    <form class="controls" id="analyticsForm">
+      <div class="field">
+        <label for="apiUrl">API Base URL</label>
+        <input type="text" id="apiUrl" value="http://localhost:8080" required>
+      </div>
+      <div class="field">
+        <label for="domain">Domain</label>
+        <input type="text" id="domain" value="example.com" placeholder="example.com" required>
+      </div>
+      <div class="field">
+        <label for="period">Period</label>
+        <select id="period">
+          <option value="LAST_24_HOURS">Last 24 Hours</option>
+          <option value="LAST_7_DAYS">Last 7 Days</option>
+          <option value="LAST_30_DAYS" selected>Last 30 Days</option>
+          <option value="LAST_6_MONTHS">Last 6 Months</option>
+          <option value="LAST_12_MONTHS">Last 12 Months</option>
+          <option value="CUSTOM">Custom Date Range</option>
+        </select>
+      </div>
+      <div class="field custom-date hidden">
+        <label for="startDate">Start Date</label>
+        <input type="date" id="startDate">
+      </div>
+      <div class="field custom-date hidden">
+        <label for="endDate">End Date</label>
+        <input type="date" id="endDate">
+      </div>
+      <button type="submit">Query Metrics</button>
+    </form>
+
+    <div id="errorMessage" class="error"></div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="label">Total Page Views</div>
+        <div class="value" id="pageViews">—</div>
+      </div>
+      <div class="card">
+        <div class="label">Unique Visitors</div>
+        <div class="value" id="visitors">—</div>
+      </div>
+      <div class="card">
+        <div class="label">Bounce Rate</div>
+        <div class="value" id="bounceRate">—</div>
+      </div>
+      <div class="card">
+        <div class="label">Avg Duration</div>
+        <div class="value" id="avgDuration">—</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('analyticsForm');
+    const periodSelect = document.getElementById('period');
+    const customDateFields = document.querySelectorAll('.custom-date');
+    const errorMessage = document.getElementById('errorMessage');
+
+    // Toggle custom date range inputs when 'CUSTOM' period is selected
+    periodSelect.addEventListener('change', () => {
+      const isCustom = periodSelect.value === 'CUSTOM';
+      customDateFields.forEach(el => el.classList.toggle('hidden', !isCustom));
+    });
+
+    // Helper to format average duration dynamically
+    function formatDuration(val) {
+      if (val === undefined || val === null) return '—';
+      const totalSeconds = val > 1000 ? Math.round(val / 1000) : Math.round(val);
+      if (totalSeconds < 60) return `${totalSeconds}s`;
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      return `${mins}m ${secs}s`;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorMessage.style.display = 'none';
+
+      const baseUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
+      const domain = document.getElementById('domain').value;
+      const period = periodSelect.value;
+
+      const params = new URLSearchParams({ domain, period });
+
+      if (period === 'CUSTOM') {
+        const start = document.getElementById('startDate').value;
+        const end = document.getElementById('endDate').value;
+        if (start) params.append('start-date', start);
+        if (end) params.append('end-date', end);
+      }
+
+      try {
+        const response = await fetch(`${baseUrl}/v1/stats/summary?${params.toString()}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          // Extract error message from standard V1ProblemDetails RFC 7807 structure
+          throw new Error(data.detail || data.title || `HTTP Error ${response.status}`);
+        }
+
+        // Display results
+        document.getElementById('pageViews').textContent = (data.pageViews ?? 0).toLocaleString();
+        document.getElementById('visitors').textContent = (data.visitors ?? 0).toLocaleString();
+        document.getElementById('bounceRate').textContent = data.bounceRate !== undefined ? `${data.bounceRate}%` : '—';
+        document.getElementById('avgDuration').textContent = formatDuration(data.averageDurationMillis);
+
+      } catch (err) {
+        errorMessage.textContent = err.message;
+        errorMessage.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

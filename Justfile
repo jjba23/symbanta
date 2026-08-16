@@ -56,6 +56,7 @@ up:
 # Tear down Docker Compose
 down:
     docker compose down
+    docker volume rm $(docker volume ls -q)
 
 # ------------------------------------------------------------------------------
 # Dev Helpers and Local Tests

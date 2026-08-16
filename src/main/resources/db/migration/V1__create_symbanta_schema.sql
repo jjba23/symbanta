@@ -28,7 +28,7 @@ CREATE TABLE events (
 COMMENT ON TABLE events IS 'Ingested privacy-friendly analytics events and pageviews without persistent cookies or PII.';
 COMMENT ON COLUMN events.id IS 'Primary key: unique identity for the logged event.';
 COMMENT ON COLUMN events.property_id IS 'Foreign key referencing the associated property domain in the properties table.';
-COMMENT ON COLUMN events.session_id IS 'Identifier to help distinguish between different sessions and tabs and instances.'
+COMMENT ON COLUMN events.session_id IS 'Identifier to help distinguish between different sessions and tabs and instances.';
 COMMENT ON COLUMN events.event_name IS 'Name of the event (e.g., page-view, click, signup).';
 COMMENT ON COLUMN events.url IS 'Full URI where the event occurred.';
 COMMENT ON COLUMN events.referrer IS 'HTTP referrer URI originating the navigation/event.';
