@@ -6,7 +6,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import org.jointhefreeworld.symbanta.domain.*
+import org.jointhefreeworld.symbanta.domain.AnalyticsEvent
+import org.jointhefreeworld.symbanta.domain.AnalyticsRepository
+import org.jointhefreeworld.symbanta.domain.EventId
+import org.jointhefreeworld.symbanta.domain.SessionId
 import org.jointhefreeworld.symbanta.openapi.controllers.V1EventsRegisterController
 import org.jointhefreeworld.symbanta.openapi.models.V1EventPayloadDto
 import org.jointhefreeworld.symbanta.openapi.models.V1EventResponseDto
@@ -30,11 +33,16 @@ class V1EventsRegisterControllerImpl(
         // Fire-and-forget background execution
         backgroundScope.launch {
             try {
+                val property =
+                    checkNotNull(analyticsRepository.getPropertyByDomain(v1EventPayload.domain)) {
+                        "Could not find property for wanted domain: ${v1EventPayload.domain}"
+                    }
+
                 val parsedPayload =
                     AnalyticsEvent(
                         id = EventId(UUID.randomUUID()),
-                        propertyId = PropertyId(UUID.randomUUID()),
-                        sessionId = v1EventPayload.sessionId.let { SessionId(it) },
+                        propertyId = property.id,
+                        sessionId = v1EventPayload.sessionId?.let { SessionId(it) },
                         eventName = v1EventPayload.name,
                         url = v1EventPayload.url?.toString(),
                         referrer = v1EventPayload.referrer?.toString(),
@@ -47,7 +55,7 @@ class V1EventsRegisterControllerImpl(
                     )
                 analyticsRepository.saveEvent(parsedPayload)
             } catch (e: Exception) {
-                logger.error(e) { "Failed to process event asynchronously" }
+                logger.error(e) { "Failed to process event" }
             }
         }
 

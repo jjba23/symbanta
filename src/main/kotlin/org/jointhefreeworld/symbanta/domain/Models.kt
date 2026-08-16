@@ -19,10 +19,17 @@ value class EventId(
     val value: UUID,
 )
 
+class Property(
+    val id: PropertyId,
+    val domain: String,
+    val createdAt: Instant,
+    val updatedAt: Instant?,
+)
+
 data class AnalyticsEvent(
     val id: EventId,
     val propertyId: PropertyId,
-    val sessionId: SessionId,
+    val sessionId: SessionId?,
     val eventName: String,
     val url: String?,
     val referrer: String?,

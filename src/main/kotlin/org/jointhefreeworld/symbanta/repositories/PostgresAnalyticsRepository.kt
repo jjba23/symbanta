@@ -1,11 +1,8 @@
-package com.symbanta.analytics.repositories
+package org.jointhefreeworld.symbanta.repositories
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.oshai.kotlinlogging.withLoggingContext
-import org.jointhefreeworld.symbanta.domain.AnalyticsEvent
-import org.jointhefreeworld.symbanta.domain.AnalyticsRepository
-import org.jointhefreeworld.symbanta.domain.EventId
-import org.jointhefreeworld.symbanta.domain.StatsSummary
+import org.jointhefreeworld.symbanta.domain.*
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
@@ -14,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.sql.ResultSet
 import java.sql.Timestamp
 import java.time.Instant
+import java.util.*
 
 @Repository
 class PostgresAnalyticsRepository(
@@ -31,12 +29,22 @@ class PostgresAnalyticsRepository(
             )
         }
 
+    private val propertyRowMapper =
+        RowMapper { rs: ResultSet, _ ->
+            Property(
+                id = PropertyId(rs.getObject("id", UUID::class.java)),
+                domain = rs.getString("domain"),
+                createdAt = rs.getTimestamp("created_at").toInstant(),
+                updatedAt = rs.getTimestamp("updated_at")?.toInstant(),
+            )
+        }
+
     @Transactional
     override fun saveEvent(event: AnalyticsEvent): EventId =
         withLoggingContext(
             "eventId" to event.id.value.toString(),
             "propertyId" to event.propertyId.value.toString(),
-            "sessionId" to event.sessionId.value.toString(),
+            "sessionId" to event.sessionId?.value,
             "eventName" to event.eventName,
             "createdAt" to event.createdAt.toString(),
         ) {
@@ -46,7 +54,7 @@ class PostgresAnalyticsRepository(
                 MapSqlParameterSource()
                     .addValue("id", event.id.value)
                     .addValue("propertyId", event.propertyId.value)
-                    .addValue("sessionId", event.sessionId.value)
+                    .addValue("sessionId", event.sessionId?.value)
                     .addValue("eventName", event.eventName)
                     .addValue("url", event.url)
                     .addValue("referrer", event.referrer)
@@ -99,6 +107,31 @@ class PostgresAnalyticsRepository(
             summary
         }
 
+    @Transactional(readOnly = true)
+    override fun getPropertyByDomain(domain: String): Property? =
+        withLoggingContext(
+            "domain" to domain,
+        ) {
+            logger.info { "Fetching property by domain from database" }
+
+            val params = MapSqlParameterSource().addValue("domain", domain)
+
+            val property =
+                namedParameterJdbcTemplate
+                    .query(getPropertyByDomainSql, params, propertyRowMapper)
+                    .singleOrNull()
+
+            if (property != null) {
+                withLoggingContext("propertyId" to property.id.value.toString()) {
+                    logger.info { "Successfully fetched property by domain" }
+                }
+            } else {
+                logger.info { "No property found for domain" }
+            }
+
+            property
+        }
+
     private companion object {
         val saveEventSql =
             """
@@ -129,6 +162,12 @@ class PostgresAnalyticsRepository(
                 :props::jsonb,
                 :createdAt
             )
+            """.trimIndent()
+
+        val getPropertyByDomainSql =
+            """
+            SELECT id, domain, created_at, updated_at FROM properties 
+            WHERE domain = :domain
             """.trimIndent()
 
         val getStatsSummarySql =
