@@ -179,7 +179,7 @@ class PostgresAnalyticsRepository(
             )
             SELECT
                 COALESCE(COUNT(*) FILTER (WHERE e.event_name = 'page-view'), 0)::bigint AS page_views,
-                COALESCE(COUNT(*), 0)::bigint AS visitors,
+                COALESCE(COUNT(session_id), 0)::bigint AS visitors,
                 0.00::numeric AS bounce_rate,
                 0.0::double precision AS avg_duration_ms
             FROM events e
