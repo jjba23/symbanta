@@ -7,3 +7,12 @@ Symbanta  is a  privacy-friendly, free and open-source software analytics platfo
 Instead of profiling individuals or building invasive cross-site identities, Symbanta treats data as pure, objective, self-contained system occurrences, moments where intent and action converge. Its open and free ethos honors its Greek roots of public transparency and shared knowledge, giving developers event-driven insights while fully preserving user privacy.
 
 -----------------------------
+
+#+begin_src sql
+INSERT INTO properties (id, domain, created_at)
+VALUES (
+    gen_random_uuid(),
+    'jointhefreeworld.org',
+    CURRENT_TIMESTAMP
+);
+#+end_src

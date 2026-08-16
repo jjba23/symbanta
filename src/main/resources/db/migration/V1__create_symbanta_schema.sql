@@ -2,7 +2,7 @@ CREATE TABLE properties (
     id UUID NOT NULL PRIMARY KEY,
     domain TEXT NOT NULL UNIQUE,
     created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
+    updated_at TIMESTAMPTZ
 );
 
 COMMENT ON TABLE properties IS 'Stores registered domains and properties managed by the Symbanta platform.';

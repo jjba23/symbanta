@@ -9,6 +9,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/app_db
     username: postgres
+    password: postgres_password
     driver-class-name: org.postgresql.Driver
   flyway:
     enabled: true
