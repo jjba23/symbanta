@@ -1,11 +1,16 @@
-package com.symbanta.analytics.domain
+package org.jointhefreeworld.symbanta.domain
 
 import java.math.BigDecimal
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 
 @JvmInline
 value class PropertyId(
+    val value: UUID,
+)
+
+@JvmInline
+value class SessionId(
     val value: UUID,
 )
 
@@ -15,16 +20,17 @@ value class EventId(
 )
 
 data class AnalyticsEvent(
-    val id: EventId = EventId(UUID.randomUUID()),
+    val id: EventId,
     val propertyId: PropertyId,
+    val sessionId: SessionId,
     val eventName: String,
-    val url: String? = null,
-    val referrer: String? = null,
-    val screenWidth: Int? = null,
-    val screenHeight: Int? = null,
-    val language: String? = null,
-    val propsJson: String = "{}",
-    val createdAt: Instant = Instant.now(),
+    val url: String?,
+    val referrer: String?,
+    val screenWidth: Int?,
+    val screenHeight: Int?,
+    val language: String?,
+    val propsJson: String,
+    val createdAt: Instant,
 )
 
 data class StatsSummary(
@@ -33,13 +39,3 @@ data class StatsSummary(
     val bounceRate: BigDecimal,
     val averageDurationMillis: Double,
 )
-
-interface AnalyticsRepository {
-    fun saveEvent(event: AnalyticsEvent): EventId
-
-    fun getStatsSummary(
-        domain: String,
-        from: Instant,
-        to: Instant,
-    ): StatsSummary
-}

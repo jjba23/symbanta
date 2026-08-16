@@ -119,6 +119,10 @@ components:
           type: string
           example: page-view
           description: Name of the event (e.g., 'page-view', 'signup-click').
+        sessionId:
+          type: string
+          example: 12i3n1ji2inu3-kn12j3n21kjn312-1kn2j3n21k3
+          description: Identifier to help distinguish between different sessions and tabs and instances.
         url:
           type: string
           format: uri

@@ -14,19 +14,21 @@ COMMENT ON COLUMN properties.updated_at IS 'Timestamp (with time zone) when the 
 CREATE TABLE events (
     id UUID NOT NULL PRIMARY KEY,
     property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+    session_id TEXT,
     event_name TEXT NOT NULL,
     url TEXT,
     referrer TEXT,
     screen_width INTEGER,
     screen_height INTEGER,
     language VARCHAR(32),
-    props JSONB NOT NULL DEFAULT '{}'::jsonb,
+    props JSONB,
     created_at TIMESTAMPTZ NOT NULL
 );
 
 COMMENT ON TABLE events IS 'Ingested privacy-friendly analytics events and pageviews without persistent cookies or PII.';
 COMMENT ON COLUMN events.id IS 'Primary key: unique identity for the logged event.';
 COMMENT ON COLUMN events.property_id IS 'Foreign key referencing the associated property domain in the properties table.';
+COMMENT ON COLUMN events.session_id IS 'Identifier to help distinguish between different sessions and tabs and instances.'
 COMMENT ON COLUMN events.event_name IS 'Name of the event (e.g., page-view, click, signup).';
 COMMENT ON COLUMN events.url IS 'Full URI where the event occurred.';
 COMMENT ON COLUMN events.referrer IS 'HTTP referrer URI originating the navigation/event.';
@@ -38,5 +40,6 @@ COMMENT ON COLUMN events.created_at IS 'Timestamp (with time zone) when the even
 
 
 CREATE INDEX idx_events_property_created ON events (property_id, created_at DESC);
+CREATE INDEX idx_events_session_created ON events (session_id, created_at DESC);
 CREATE INDEX idx_events_event_name ON events (event_name);
 CREATE INDEX idx_events_props ON events USING gin (props);

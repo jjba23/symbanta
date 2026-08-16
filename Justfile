@@ -56,3 +56,10 @@ up:
 # Tear down Docker Compose
 down:
     docker compose down
+
+# ------------------------------------------------------------------------------
+# Dev Helpers and Local Tests
+# ------------------------------------------------------------------------------
+
+dev-get-summary:
+    curl --verbose "http://localhost:8080/v1/stats/summary?domain=jointhefreeworld.org"

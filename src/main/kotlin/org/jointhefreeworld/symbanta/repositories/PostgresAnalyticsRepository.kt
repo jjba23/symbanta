@@ -1,8 +1,11 @@
 package com.symbanta.analytics.repositories
 
-import com.symbanta.analytics.domain.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.oshai.kotlinlogging.withLoggingContext
+import org.jointhefreeworld.symbanta.domain.AnalyticsEvent
+import org.jointhefreeworld.symbanta.domain.AnalyticsRepository
+import org.jointhefreeworld.symbanta.domain.EventId
+import org.jointhefreeworld.symbanta.domain.StatsSummary
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
@@ -33,6 +36,7 @@ class PostgresAnalyticsRepository(
         withLoggingContext(
             "eventId" to event.id.value.toString(),
             "propertyId" to event.propertyId.value.toString(),
+            "sessionId" to event.sessionId.value.toString(),
             "eventName" to event.eventName,
             "createdAt" to event.createdAt.toString(),
         ) {
@@ -42,6 +46,7 @@ class PostgresAnalyticsRepository(
                 MapSqlParameterSource()
                     .addValue("id", event.id.value)
                     .addValue("propertyId", event.propertyId.value)
+                    .addValue("sessionId", event.sessionId.value)
                     .addValue("eventName", event.eventName)
                     .addValue("url", event.url)
                     .addValue("referrer", event.referrer)
@@ -99,6 +104,7 @@ class PostgresAnalyticsRepository(
             INSERT INTO events (
                 id,
                 property_id,
+                session_id,
                 event_name,
                 url,
                 referrer,
@@ -110,6 +116,7 @@ class PostgresAnalyticsRepository(
             ) VALUES (
                 :id,
                 :propertyId,
+                :sessionId,
                 :eventName,
                 :url,
                 :referrer,
