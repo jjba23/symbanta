@@ -6,6 +6,7 @@ import org.jointhefreeworld.symbanta.openapi.models.PeriodDto
 import org.jointhefreeworld.symbanta.openapi.models.V1StatsSummaryResponseDto
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.RestController
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -14,6 +15,7 @@ import java.time.temporal.ChronoUnit
 @RestController
 class V1StatsSummaryControllerImpl(
     private val analyticsRepository: AnalyticsRepository,
+    private val clock: Clock,
 ) : V1StatsSummaryController {
     override fun getStatsSummary(
         domain: String,
@@ -21,20 +23,25 @@ class V1StatsSummaryControllerImpl(
         startDate: LocalDate?,
         endDate: LocalDate?,
     ): ResponseEntity<V1StatsSummaryResponseDto> {
+        val now = clock.instant()
         val from: Instant =
             if (period == PeriodDto.CUSTOM) {
                 checkNotNull(startDate).atStartOfDay().atZone(ZoneId.systemDefault()).toInstant()
             } else {
-                // TODO period support
-                Instant.now().minus(1, ChronoUnit.DAYS)
+                when (period) {
+                    PeriodDto.LAST_12_MONTHS -> Instant.now().minus(12, ChronoUnit.MONTHS)
+                    PeriodDto.LAST_6_MONTHS -> Instant.now().minus(6, ChronoUnit.MONTHS)
+                    PeriodDto.LAST_30_DAYS -> Instant.now().minus(30, ChronoUnit.DAYS)
+                    PeriodDto.LAST_7_DAYS -> Instant.now().minus(7, ChronoUnit.DAYS)
+                    PeriodDto.LAST_24_HOURS -> Instant.now().minus(24, ChronoUnit.HOURS)
+                }
             }
 
         val to: Instant =
             if (period == PeriodDto.CUSTOM) {
                 checkNotNull(endDate).atStartOfDay().atZone(ZoneId.systemDefault()).toInstant()
             } else {
-                // TODO period support
-                Instant.now()
+                now
             }
 
         val summary = analyticsRepository.getStatsSummary(domain = domain, from = from, to = to)
