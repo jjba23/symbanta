@@ -1,5 +1,7 @@
 #+title: symbanta: Συμβάντα
 
+[🚧 Work in Progress]
+
 Symbanta (Greek: *Συμβάντα*, singular *Συμβάν* / *Symban*) originates from the Ancient Greek verb /συμβαίνω/ (/sumbainō/), a compound of /syn-/ ("together") and /bainō/ ("to step or walk"). It translates to: /events, occurrences, or happenings/.
 
 Symbanta  is a  privacy-friendly, free and open-source software analytics platform. It tries to inspire a return to what web measurement should be: tracking *what happened so as to improve user experience and reliability*, not *who did it and how and how long* for profit.
