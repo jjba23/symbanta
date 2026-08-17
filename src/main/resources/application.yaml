@@ -10,7 +10,8 @@ spring:
     url: jdbc:postgresql://localhost:5432/app_db
     username: postgres
     password: postgres_password
-    driver-class-name: org.postgresql.Driver
+    hikari:
+      initialization-fail-timeout: 5000
   flyway:
     enabled: true
 

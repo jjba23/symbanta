@@ -173,19 +173,44 @@ class PostgresAnalyticsRepository(
         val getStatsSummarySql =
             """
             WITH target_property AS (
-                SELECT id
-                FROM properties
-                WHERE domain = :domain
+                SELECT id FROM properties WHERE domain = :domain
+            ),
+            session_metrics AS (
+                SELECT
+                    e.session_id,
+                    COUNT(*) FILTER (WHERE e.event_name = 'page-view') AS pv_count
+                FROM events e
+                JOIN target_property tp ON e.property_id = tp.id
+                WHERE e.created_at >= :from AND e.created_at < :to AND e.session_id IS NOT NULL
+                GROUP BY e.session_id
+            ),
+            event_deltas AS (
+                SELECT
+                    e.session_id,
+                    EXTRACT(EPOCH FROM (e.created_at - LAG(e.created_at) OVER (PARTITION BY e.session_id ORDER BY e.created_at))) AS gap_sec
+                FROM events e
+                JOIN target_property tp ON e.property_id = tp.id
+                WHERE e.created_at >= :from AND e.created_at < :to AND e.session_id IS NOT NULL
+            ),
+            active_durations AS (
+                SELECT
+                    session_id,
+                    SUM(CASE WHEN gap_sec <= 30 THEN gap_sec * 1000 ELSE 0 END) AS active_ms
+                FROM event_deltas
+                WHERE gap_sec IS NOT NULL
+                GROUP BY session_id
             )
             SELECT
-                COALESCE(COUNT(*) FILTER (WHERE e.event_name = 'page-view'), 0)::bigint AS page_views,
-                COALESCE(COUNT(session_id), 0)::bigint AS visitors,
-                0.00::numeric AS bounce_rate,
-                0.0::double precision AS avg_duration_ms
-            FROM events e
-            JOIN target_property tp ON e.property_id = tp.id
-            WHERE e.created_at >= :from
-              AND e.created_at < :to;
+                COALESCE(SUM(sm.pv_count), 0)::bigint AS page_views,
+                COALESCE(COUNT(sm.session_id), 0)::bigint AS visitors,
+                COALESCE(
+                    (COUNT(*) FILTER (WHERE sm.pv_count = 1 AND COALESCE(ad.active_ms, 0) < 10000)::numeric / 
+                     NULLIF(COUNT(sm.session_id), 0)) * 100, 
+                    0.00
+                )::numeric AS bounce_rate,
+                COALESCE(AVG(ad.active_ms), 0.0)::double precision AS avg_duration_ms
+            FROM session_metrics sm
+            LEFT JOIN active_durations ad ON sm.session_id = ad.session_id;        
             """.trimIndent()
     }
 }
