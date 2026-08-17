@@ -2,13 +2,17 @@
 
 [🚧 Work in Progress]
 
-Symbanta (Greek: *Συμβάντα*, singular *Συμβάν* / *Symban*) originates from the Ancient Greek verb /συμβαίνω/ (/sumbainō/), a compound of /syn-/ ("together") and /bainō/ ("to step or walk"). It translates to: /events, occurrences, or happenings/.
+Symbanta  is a  privacy-friendly, free and open-source software analytics platform.
 
-Symbanta  is a  privacy-friendly, free and open-source software analytics platform. It tries to inspire a return to what web measurement should be: tracking *what happened so as to improve user experience and reliability*, not *who did it and how and how long* for profit.
+It tries to inspire a return to what measurement should be: tracking *what happened so as to improve user experience and reliability*, not for profit and selling customized ads to people.
+
+Symbanta (Greek: *Συμβάντα*, singular *Συμβάν* / *Symban*) originates from the Ancient Greek verb /συμβαίνω/ (/sumbainō/), a compound of /syn-/ ("together") and /bainō/ ("to step or walk"). It translates to: /events, occurrences, or happenings/.
 
 Instead of profiling individuals or building invasive cross-site identities, Symbanta treats data as pure, objective, self-contained system occurrences, moments where intent and action converge. Its open and free ethos honors its Greek roots of public transparency and shared knowledge, giving developers event-driven insights while fully preserving user privacy.
 
 -----------------------------
+
+WIP: You can easily register properties in the database like this (with your domain ~localhost~ or ~example.com~ , etc.)
 
 #+begin_src sql
 INSERT INTO properties (id, domain, created_at)
