@@ -4,49 +4,72 @@
     <meta charset="UTF-8">
     <title>Symbanta Telemetry Demo</title>
     <script>
-        (function () {
-            const SYMBANTA_ENDPOINT = "http://localhost:8080/v1/events/register";
-            const DOMAIN_NAME = "localhost";
 
-            // Get or create a session ID limited to current tab lifecycle
-            let sessionId = sessionStorage.getItem("symbanta_session_id");
-            if (!sessionId) {
-                sessionId = crypto.randomUUID();
-                sessionStorage.setItem("symbanta_session_id", sessionId);
-            }
+      (function () {
+    const SYMBANTA_ENDPOINT = "http://localhost:8080/v1/events/register";
+    const DOMAIN_NAME = "localhost";
+    const HEARTBEAT_INTERVAL_MS = 10000;
 
-            // Construct EventPayload
-            const payload = {
-                domain: DOMAIN_NAME,
-                name: "page-view",
-                sessionId: sessionId,
-                userAgent: navigator.userAgent,
-                url: window.location.href,
-                referrer: document.referrer || null,
-                screenWidth: window.screen.width,
-                screenHeight: window.screen.height,
-                language: navigator.language
-            };
+    // Get or create a session ID limited to current tab lifecycle
+    let sessionId = sessionStorage.getItem("symbanta_session_id");
+    if (!sessionId) {
+        sessionId = crypto.randomUUID();
+        sessionStorage.setItem("symbanta_session_id", sessionId);
+    }
 
-            // Transmit payload using Blob to preserve application/json header with sendBeacon
-            const blob = new Blob([JSON.stringify(payload)], {type: "application/json"});
-            const queued = navigator.sendBeacon(SYMBANTA_ENDPOINT, blob);
+    // Construct EventPayload
+    const createPayload = (eventName) => ({
+        domain: DOMAIN_NAME,
+        name: eventName,
+        sessionId: sessionId,
+        userAgent: navigator.userAgent,
+        url: window.location.href,
+        referrer: document.referrer || null,
+        screenWidth: window.screen.width,
+        screenHeight: window.screen.height,
+        language: navigator.language
+    });
 
-            // Fallback to fetch if sendBeacon is unavailable or fails
-            if (!queued) {
-                fetch(SYMBANTA_ENDPOINT, {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify(payload),
-                    keepalive: true
-                }).catch(() => {
-                });
-            }
-        })();
+    const sendEvent = (eventName) => {
+        const payload = createPayload(eventName);
+
+        // Transmit payload using Blob to preserve application/json header with sendBeacon
+        const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+        const queued = navigator.sendBeacon(SYMBANTA_ENDPOINT, blob);
+
+        // Fallback to fetch if sendBeacon is unavailable or fails
+        if (!queued) {
+            fetch(SYMBANTA_ENDPOINT, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+                keepalive: true
+            }).catch(() => {});
+        }
+    };
+
+    // Initial page view
+    sendEvent("page-view");
+
+    // Periodic heartbeat (only when tab is visible)
+    setInterval(() => {
+        if (document.visibilityState === "visible") {
+            sendEvent("heartbeat");
+        }
+    }, HEARTBEAT_INTERVAL_MS);
+
+    // Final heartbeat when tab/page is hidden or closed
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") {
+            sendEvent("visibility-change");
+        }
+    });
+})();
     </script>
 </head>
 <body>
-<h1>Analytics Test Page</h1>
-<p>A <code>page-view</code> event has been transmitted to Symbanta.</p>
+  <h1>Συμβάντα (<em>symbanta</em>) Analytics Test Page</h1>
+  <p>In this page we showcase how to instrument web applications and documents with <code>symbanta</code></p>
+  <p>A <code>page-view</code> event has been transmitted to Symbanta.</p>
 </body>
 </html>
