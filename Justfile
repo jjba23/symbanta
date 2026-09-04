@@ -49,18 +49,18 @@ check: lint test
 # Containers & Compose
 # ------------------------------------------------------------------------------
 
-# Build Docker image
-docker-build tag="latest":
-    docker build -t app:{{ tag }} .
+# Build Podman image
+podman-build tag="latest":
+    podman build -t app:{{ tag }} .
 
-# Spin up Docker Compose environment (with image rebuild)
+# Spin up Podman Compose environment (with image rebuild)
 up:
-    docker compose up --build
+    podman compose up --build
 
-# Tear down Docker Compose
+# Tear down Podman Compose
 down:
-    docker compose down
-    docker volume rm $(docker volume ls -q)
+    podman compose down
+    podman volume rm $(podman volume ls -q)
 
 # ------------------------------------------------------------------------------
 # Dev Helpers and Local Tests
