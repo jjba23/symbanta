@@ -151,7 +151,6 @@ components:
           description: Browser user agent
         props:
           type: object
-          additionalProperties: true
           example:
             plan: pro
             theme: dark
@@ -214,4 +213,3 @@ components:
           format: uri-reference
           example: "/v1/events/register"
           description: A URI reference identifying the specific occurrence of the problem.
-        additionalProperties: true
