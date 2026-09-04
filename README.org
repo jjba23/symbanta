@@ -12,7 +12,7 @@ Instead of profiling individuals or building invasive cross-site identities, Sym
 
 -----------------------------
 
-WIP: You can easily register properties in the database like this (with your domain ~localhost~ or ~example.com~ , etc.)
+You can easily register properties in the database like this (with your domain ~localhost~ or ~example.com~ , etc.)
 
 #+begin_src sql
 INSERT INTO properties (id, domain, created_at)
@@ -21,4 +21,14 @@ VALUES (
     'localhost',
     CURRENT_TIMESTAMP
 );
+#+end_src
+
+----------
+
+On the client side, simply load the ~symbanta~ script instrumentation in a page and all will work out-of-the-box. Configuration is done via the ~data~ tags.
+
+See [[file:./src/main/resources/js/symbanta.js][file:./src/main/resources/js/symbanta.js]]
+
+#+begin_src html
+<script defer src="http://localhost:8080/symbanta.js" data-endpoint="http://localhost:8080/v1/events/register"></script>
 #+end_src

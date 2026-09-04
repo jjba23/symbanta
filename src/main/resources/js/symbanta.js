@@ -1,22 +1,70 @@
+// @ts-check
+"use strict";
+
 (function () {
-    // Read config options from the <script> tag attributes, falling back to sensible defaults
-    const scriptTag = document.currentScript || document.querySelector('script[src*="symbanta"]');
+    /**
+     * @typedef {"page-view" | "heartbeat" | "visibility-change"} EventName
+     */
+
+    /**
+     * @typedef {Object} EventPayload
+     * @property {string} domain
+     * @property {EventName} name
+     * @property {string} sessionId
+     * @property {string} userAgent
+     * @property {string} url
+     * @property {string | null} referrer
+     * @property {number} screenWidth
+     * @property {number} screenHeight
+     * @property {string} language
+     */
+
+    // Ensure strict casting of the script element
+    /** @type {HTMLScriptElement | null} */
+    const scriptTag = (document.currentScript instanceof HTMLScriptElement ? document.currentScript : null)
+        || document.querySelector('script[src*="symbanta"]');
+
+    // Read config options from the <script> tag attributes
     const SYMBANTA_ENDPOINT = scriptTag?.getAttribute("data-endpoint") || "http://localhost:8080/v1/events/register";
     const DOMAIN_NAME = scriptTag?.getAttribute("data-domain") || window.location.hostname;
-    const HEARTBEAT_INTERVAL_MS = parseInt(scriptTag?.getAttribute("data-interval"), 10) || 6000;
+
+    // Safer integer parsing to avoid NaN bypassing the default fallback
+    const rawInterval = scriptTag?.getAttribute("data-interval");
+    const parsedInterval = rawInterval ? parseInt(rawInterval, 10) : NaN;
+    const HEARTBEAT_INTERVAL_MS = Number.isNaN(parsedInterval) || parsedInterval <= 0 ? 6000 : parsedInterval;
+
+    /**
+     * crypto.randomUUID() is only available in secure contexts (HTTPS).
+     * This provides a safe fallback if it is missing.
+     * @returns {string}
+     */
+    const generateUUID = () => {
+        if (typeof crypto !== "undefined" && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    };
 
     // Get or create a session ID limited to current tab lifecycle
     let sessionId = sessionStorage.getItem("symbanta_session_id");
     if (!sessionId) {
-        sessionId = crypto.randomUUID();
+        sessionId = generateUUID();
         sessionStorage.setItem("symbanta_session_id", sessionId);
     }
 
-    // Construct EventPayload
+    /**
+     * Constructs the payload object
+     * @param {EventName} eventName
+     * @returns {EventPayload}
+     */
     const createPayload = (eventName) => ({
         domain: DOMAIN_NAME,
         name: eventName,
-        sessionId: sessionId,
+        sessionId: /** @type {string} */ (sessionId),
         userAgent: navigator.userAgent,
         url: window.location.href,
         referrer: document.referrer || null,
@@ -25,21 +73,35 @@
         language: navigator.language
     });
 
+    /**
+     * Transmits the event to the endpoint
+     * @param {EventName} eventName
+     */
     const sendEvent = (eventName) => {
-        const payload = createPayload(eventName);
+        try {
+            const payload = createPayload(eventName);
+            const blob = new Blob([JSON.stringify(payload)], {type: "application/json"});
 
-        // Transmit payload using Blob to preserve application/json header with sendBeacon
-        const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
-        const queued = navigator.sendBeacon(SYMBANTA_ENDPOINT, blob);
+            let queued = false;
 
-        // Fallback to fetch if sendBeacon is unavailable or fails
-        if (!queued) {
-            fetch(SYMBANTA_ENDPOINT, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-                keepalive: true
-            }).catch(() => {});
+            // Feature detect sendBeacon (not available in some older browsers or strict webviews)
+            if (typeof navigator.sendBeacon === "function") {
+                queued = navigator.sendBeacon(SYMBANTA_ENDPOINT, blob);
+            }
+
+            // Fallback to fetch if sendBeacon is unavailable or fails
+            if (!queued && typeof fetch === "function") {
+                fetch(SYMBANTA_ENDPOINT, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify(payload),
+                    keepalive: true
+                }).catch(() => { /* Fail silently */
+                });
+            }
+        } catch (error) {
+            // Prevent analytics errors from breaking the host page
+            console.warn("Symbanta analytics error:", error);
         }
     };
 
