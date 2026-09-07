@@ -190,7 +190,7 @@ class PostgresAnalyticsRepository(
                     EXTRACT(EPOCH FROM (e.created_at - LAG(e.created_at) OVER (PARTITION BY e.session_id ORDER BY e.created_at))) AS gap_sec
                 FROM events e
                 JOIN target_property tp ON e.property_id = tp.id
-                WHERE e.created_at >= :from AND e.created_at < :to AND e.session_id IS NOT NULL
+                WHERE e.created_at >= :from AND e.created_at <= :to AND e.session_id IS NOT NULL
             ),
             active_durations AS (
                 SELECT

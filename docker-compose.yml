@@ -19,20 +19,20 @@ services:
       timeout: 5s
       retries: 5
 
-  application:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://database:5432/app_db
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=postgres_password
-    ports:
-      - "8080:8080"
-    depends_on:
-      database:
-        condition: service_healthy
+  # application:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   environment:
+  #     - SPRING_PROFILES_ACTIVE=docker
+  #     - SPRING_DATASOURCE_URL=jdbc:postgresql://database:5432/app_db
+  #     - SPRING_DATASOURCE_USERNAME=postgres
+  #     - SPRING_DATASOURCE_PASSWORD=postgres_password
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     database:
+  #       condition: service_healthy
 
 volumes:
   postgres_data:

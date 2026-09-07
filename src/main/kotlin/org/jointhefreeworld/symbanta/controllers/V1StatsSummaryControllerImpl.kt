@@ -12,6 +12,22 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
+const val TIMEZONE = "Europe/Amsterdam"
+
+fun instantAtStartOfDay(i: Instant): Instant =
+    LocalDate
+        .ofInstant(i, ZoneId.of(TIMEZONE))
+        .atStartOfDay()
+        .atZone(ZoneId.of(TIMEZONE))
+        .toInstant()
+
+fun instantAtEndOfDay(i: Instant): Instant =
+    LocalDate
+        .ofInstant(i, ZoneId.of(TIMEZONE))
+        .atStartOfDay()
+        .atZone(ZoneId.of(TIMEZONE))
+        .toInstant()
+
 @RestController
 class V1StatsSummaryControllerImpl(
     private val analyticsRepository: AnalyticsRepository,
@@ -26,7 +42,7 @@ class V1StatsSummaryControllerImpl(
         val now = clock.instant()
         val from: Instant =
             if (period == PeriodDto.CUSTOM) {
-                checkNotNull(startDate).atStartOfDay().atZone(ZoneId.systemDefault()).toInstant()
+                checkNotNull(startDate).atStartOfDay().atZone(ZoneId.of(TIMEZONE)).toInstant()
             } else {
                 when (period) {
                     PeriodDto.LAST_12_MONTHS -> Instant.now().minus(12, ChronoUnit.MONTHS)
@@ -39,7 +55,11 @@ class V1StatsSummaryControllerImpl(
 
         val to: Instant =
             if (period == PeriodDto.CUSTOM) {
-                checkNotNull(endDate).atStartOfDay().atZone(ZoneId.systemDefault()).toInstant()
+                checkNotNull(endDate)
+                    .plusDays(1)
+                    .atStartOfDay()
+                    .atZone(ZoneId.of(TIMEZONE))
+                    .toInstant()
             } else {
                 now
             }
@@ -51,6 +71,8 @@ class V1StatsSummaryControllerImpl(
                 visitors = summary.visitors.toInt(),
                 bounceRate = summary.bounceRate,
                 averageDurationMillis = summary.averageDurationMillis,
+                from = from,
+                to = to,
             ),
         )
     }
