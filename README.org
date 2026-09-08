@@ -1,6 +1,4 @@
-#+title: symbanta: Συμβάντα
-
-[🚧 Work in Progress]
+#+title: symbanta 🌿 Συμβάντα
 
 Symbanta  is a  privacy-friendly, free and open-source software analytics platform.
 
@@ -32,3 +30,40 @@ See [[file:./src/main/resources/js/symbanta.js][file:./src/main/resources/js/sym
 #+begin_src html
 <script defer src="http://localhost:8080/symbanta.js" data-endpoint="http://localhost:8080/v1/events/register"></script>
 #+end_src
+
+----------------
+
+* Licensing
+
+This project and all of its source code are free software, licensed under the GNU Affero General Public License v3 (or newer at your convenience).
+
+https://www.gnu.org/licenses/agpl-3.0.html
+
+The documentation and examples, including this document, which are provided are all licensed under the GNU Free Documentation License v1.3 (or newer at your convenience).
+
+https://www.gnu.org/licenses/fdl-1.3.html
+
+-------
+
+* AI Policy
+
+This project adheres to the [[https://jointhefreeworld.org/blog/articles/personal/jointhefreeworld-ai-policy/index.html][jointhefreeworld AI (Artificial Intelligence) policy]].
+
+Our core principle is simple: *AI should assist human creativity and problem-solving, never replace human reasoning.*
+
+While tools like Large Language Models (LLMs) and interactive chatbots can be beneficial for reviewing, refactoring small functions, or acting as a sounding board, they should be used with moderation.
+
+We require a human in the loop for all contributions. The use of autonomous AI agents to automatically generate and submit pull requests to this project is strictly prohibited.
+
+
+-----------------------
+
+* Code of conduct
+
+This project adheres to the jointhefreeworld code of conduct. Find it here:
+
+https://jointhefreeworld.org/blog/articles/personal/jointhefreeworld-code-of-conduct/index.html
+
+In summary, we foster an inclusive, respectful, and cooperative environment for all contributors and users of this free software project. Inspired by the ideals of the GNU Project, we strive to uphold freedom, equality, and community as guiding principles. We believe that collaboration in a community of mutual respect is essential to creating excellent free software.
+
+-------
