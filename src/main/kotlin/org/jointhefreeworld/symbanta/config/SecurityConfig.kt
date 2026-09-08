@@ -24,7 +24,7 @@ class SecurityConfig {
             .cors { it.configurationSource(corsConfigurationSource()) }
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers("/api/auth/**")
+                    .requestMatchers("/api/auth/**", "/v1/events/register")
                     .permitAll()
                     .requestMatchers("/api/admin/**")
                     .hasAuthority("ROLE_ADMIN")

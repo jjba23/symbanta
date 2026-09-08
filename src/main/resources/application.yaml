@@ -38,3 +38,8 @@ management:
     metrics:
       export:
         enabled: false
+logging:
+  level:
+    org:
+      springframework:
+        security: DEBUG
