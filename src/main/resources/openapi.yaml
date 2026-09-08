@@ -32,6 +32,74 @@ servers:
     description: Production Server
 
 paths:
+  /api/auth/login:
+    post:
+      summary: User login
+      description: Authenticates user credentials and establishes a session cookie.
+      operationId: login
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Successfully authenticated and session cookie created
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: Contains JSESSIONID cookie for session management
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid username or password
+          content:
+            application/problem+detail:
+              schema:
+                $ref: "#/components/schemas/V1ProblemDetails"
+
+  /api/auth/logout:
+    post:
+      summary: User logout
+      description: Invalidates the current session and clears the security context.
+      operationId: logout
+      tags:
+        - Authentication
+      responses:
+        "200":
+          description: Successfully invalidated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /api/auth/me:
+    get:
+      summary: Get currently authenticated user details
+      description: Checks current session status and returns user credentials if authenticated.
+      operationId: getCurrentUser
+      tags:
+        - Authentication
+      responses:
+        "200":
+          description: Authenticated user details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: User is not authenticated or session expired
+          content:
+            application/problem+detail:
+              schema:
+                $ref: "#/components/schemas/V1ProblemDetails"
+
   /v1/events/register:
     post:
       summary: Register an event
@@ -180,6 +248,40 @@ paths:
 
 components:
   schemas:
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          format: password
+          example: password123
+
+    AuthResponse:
+      type: object
+      required:
+        - username
+        - role
+      properties:
+        username:
+          type: string
+          example: admin
+        role:
+          type: string
+          example: ROLE_USER
+
+    MessageResponse:
+      type: object
+      additionalProperties:
+        type: string
+      example:
+        message: Logged out successfully
+
     V1EventPayload:
       type: object
       required:
