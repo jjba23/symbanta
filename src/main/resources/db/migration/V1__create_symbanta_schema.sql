@@ -1,6 +1,25 @@
-CREATE TABLE properties (
-    id UUID NOT NULL PRIMARY KEY,
-    domain TEXT NOT NULL UNIQUE,
+-- symbanta
+--
+-- Copyright © Josep Bigorra <jjbigorra@gmail.com>
+--
+-- symbanta is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU Affero General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- symbanta is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-- GNU Affero General Public License for more details.
+--
+-- You should have received a copy of the GNU Affero General Public License
+-- along with symbanta.  If not, see <https://www.gnu.org/licenses/>.
+--
+
+CREATE TABLE properties
+(
+    id         UUID        NOT NULL PRIMARY KEY,
+    domain     TEXT        NOT NULL UNIQUE,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ
 );
@@ -11,19 +30,20 @@ COMMENT ON COLUMN properties.domain IS 'Unique registered domain name (e.g., exa
 COMMENT ON COLUMN properties.created_at IS 'Timestamp (with time zone) when the domain record was created.';
 COMMENT ON COLUMN properties.updated_at IS 'Timestamp (with time zone) when the domain record was last updated.';
 
-CREATE TABLE events (
-    id UUID NOT NULL PRIMARY KEY,
-    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
-    session_id TEXT,
-    event_name TEXT NOT NULL,
-    url TEXT,
-    referrer TEXT,
-    screen_width INTEGER,
+CREATE TABLE events
+(
+    id            UUID        NOT NULL PRIMARY KEY,
+    property_id   UUID        NOT NULL REFERENCES properties (id) ON DELETE CASCADE,
+    session_id    TEXT,
+    event_name    TEXT        NOT NULL,
+    url           TEXT,
+    referrer      TEXT,
+    screen_width  INTEGER,
     screen_height INTEGER,
-    language VARCHAR(32),
-    user_agent TEXT,
-    props JSONB,
-    created_at TIMESTAMPTZ NOT NULL
+    language      VARCHAR(32),
+    user_agent    TEXT,
+    props         JSONB,
+    created_at    TIMESTAMPTZ NOT NULL
 );
 
 COMMENT ON TABLE events IS 'Ingested privacy-friendly analytics events and pageviews without persistent cookies or PII.';
