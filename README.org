@@ -10,6 +10,10 @@ Instead of profiling individuals or building invasive cross-site identities, Sym
 
 -----------------------------
 
+[[https://jointhefreeworld.org/static-assets/symbanta/screen-2026-09-08-15-17-45.png]]
+
+-------
+
 You can easily register properties in the database like this (with your domain ~localhost~ or ~example.com~ , etc.)
 
 #+begin_src sql
