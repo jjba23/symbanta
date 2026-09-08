@@ -28,22 +28,22 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 
 const val TIMEZONE = "Europe/Amsterdam"
 
+val ZONE_ID: ZoneId = ZoneId.of(TIMEZONE)
+
 fun instantAtStartOfDay(i: Instant): Instant =
     LocalDate
-        .ofInstant(i, ZoneId.of(TIMEZONE))
-        .atStartOfDay()
-        .atZone(ZoneId.of(TIMEZONE))
+        .ofInstant(i, ZONE_ID)
+        .atStartOfDay(ZONE_ID)
         .toInstant()
 
 fun instantAtEndOfDay(i: Instant): Instant =
     LocalDate
-        .ofInstant(i, ZoneId.of(TIMEZONE))
-        .atStartOfDay()
-        .atZone(ZoneId.of(TIMEZONE))
+        .ofInstant(i, ZONE_ID)
+        .plusDays(1)
+        .atStartOfDay(ZONE_ID)
         .toInstant()
 
 @RestController
@@ -58,16 +58,19 @@ class V1StatsSummaryControllerImpl(
         endDate: LocalDate?,
     ): ResponseEntity<V1StatsSummaryResponseDto> {
         val now = clock.instant()
+        val zdt = now.atZone(ZONE_ID)
+
         val from: Instant =
             if (period == PeriodDto.CUSTOM) {
-                checkNotNull(startDate).atStartOfDay().atZone(ZoneId.of(TIMEZONE)).toInstant()
+                checkNotNull(startDate).atStartOfDay(ZONE_ID).toInstant()
             } else {
                 when (period) {
-                    PeriodDto.LAST_12_MONTHS -> Instant.now().minus(12, ChronoUnit.MONTHS)
-                    PeriodDto.LAST_6_MONTHS -> Instant.now().minus(6, ChronoUnit.MONTHS)
-                    PeriodDto.LAST_30_DAYS -> Instant.now().minus(30, ChronoUnit.DAYS)
-                    PeriodDto.LAST_7_DAYS -> Instant.now().minus(7, ChronoUnit.DAYS)
-                    PeriodDto.LAST_24_HOURS -> Instant.now().minus(24, ChronoUnit.HOURS)
+                    PeriodDto.LAST_12_MONTHS -> zdt.minusMonths(12).toInstant()
+                    PeriodDto.LAST_6_MONTHS -> zdt.minusMonths(6).toInstant()
+                    PeriodDto.LAST_30_DAYS -> zdt.minusDays(30).toInstant()
+                    PeriodDto.LAST_7_DAYS -> zdt.minusDays(7).toInstant()
+                    PeriodDto.LAST_24_HOURS -> zdt.minusHours(24).toInstant()
+                    PeriodDto.CUSTOM -> throw IllegalArgumentException("Custom period requires dates")
                 }
             }
 
@@ -75,8 +78,7 @@ class V1StatsSummaryControllerImpl(
             if (period == PeriodDto.CUSTOM) {
                 checkNotNull(endDate)
                     .plusDays(1)
-                    .atStartOfDay()
-                    .atZone(ZoneId.of(TIMEZONE))
+                    .atStartOfDay(ZONE_ID)
                     .toInstant()
             } else {
                 now
