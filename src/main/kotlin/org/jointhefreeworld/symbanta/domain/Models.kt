@@ -47,3 +47,17 @@ data class StatsSummary(
     val bounceRate: BigDecimal,
     val averageDurationMillis: BigDecimal,
 )
+
+enum class TimeGranularity(
+    val unit: String,
+    val intervalStep: String,
+) {
+    HOUR("hour", "1 hour"),
+    DAY("day", "1 day"),
+}
+
+data class TimeSeriesPoint(
+    val timestamp: Instant,
+    val pageViews: Long,
+    val visitors: Long,
+)

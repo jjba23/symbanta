@@ -12,4 +12,11 @@ interface AnalyticsRepository {
         from: Instant,
         to: Instant,
     ): StatsSummary
+
+    fun getTimeSeriesStats(
+        domain: String,
+        from: Instant,
+        to: Instant,
+        granularity: TimeGranularity,
+    ): List<TimeSeriesPoint>
 }

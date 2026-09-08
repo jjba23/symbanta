@@ -107,6 +107,41 @@ class PostgresAnalyticsRepository(
             summary
         }
 
+    private val timeSeriesPointRowMapper =
+        RowMapper { rs: ResultSet, _ ->
+            TimeSeriesPoint(
+                timestamp = rs.getTimestamp("bucket").toInstant(),
+                pageViews = rs.getLong("page_views"),
+                visitors = rs.getLong("visitors"),
+            )
+        }
+
+    @Transactional(readOnly = true)
+    override fun getTimeSeriesStats(
+        domain: String,
+        from: Instant,
+        to: Instant,
+        granularity: TimeGranularity,
+    ): List<TimeSeriesPoint> =
+        withLoggingContext(
+            "domain" to domain,
+            "from" to from.toString(),
+            "to" to to.toString(),
+            "granularity" to granularity.name,
+        ) {
+            logger.info { "Fetching time-series analytics stats from database" }
+
+            val params =
+                MapSqlParameterSource()
+                    .addValue("domain", domain)
+                    .addValue("from", Timestamp.from(from))
+                    .addValue("to", Timestamp.from(to))
+                    .addValue("granularity", granularity.unit)
+                    .addValue("intervalStep", granularity.intervalStep)
+
+            namedParameterJdbcTemplate.query(getTimeSeriesStatsSql, params, timeSeriesPointRowMapper)
+        }
+
     @Transactional(readOnly = true)
     override fun getPropertyByDomain(domain: String): Property? =
         withLoggingContext(
@@ -211,6 +246,37 @@ class PostgresAnalyticsRepository(
                 COALESCE(AVG(ad.active_ms), 0.0)::double precision AS avg_duration_ms
             FROM session_metrics sm
             LEFT JOIN active_durations ad ON sm.session_id = ad.session_id;        
+            """.trimIndent()
+
+        val getTimeSeriesStatsSql =
+            """
+            WITH target_property AS (
+                SELECT id FROM properties WHERE domain = :domain
+            ),
+            time_buckets AS (
+                SELECT generate_series(
+                    date_trunc(:granularity, :from::timestamp),
+                    date_trunc(:granularity, :to::timestamp),
+                    :intervalStep::interval
+                ) AS bucket
+            ),
+            aggregated_events AS (
+                SELECT
+                    date_trunc(:granularity, e.created_at) AS bucket,
+                    COUNT(*) FILTER (WHERE e.event_name = 'page-view') AS page_views,
+                    COUNT(DISTINCT e.session_id) AS visitors
+                FROM events e
+                JOIN target_property tp ON e.property_id = tp.id
+                WHERE e.created_at >= :from AND e.created_at <= :to
+                GROUP BY 1
+            )
+            SELECT
+                tb.bucket,
+                COALESCE(ae.page_views, 0)::bigint AS page_views,
+                COALESCE(ae.visitors, 0)::bigint AS visitors
+            FROM time_buckets tb
+            LEFT JOIN aggregated_events ae ON tb.bucket = ae.bucket
+            ORDER BY tb.bucket ASC;
             """.trimIndent()
     }
 }

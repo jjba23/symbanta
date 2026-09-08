@@ -103,6 +103,63 @@ paths:
               schema:
                 $ref: "#/components/schemas/V1ProblemDetails"
 
+  /v1/stats/timeseries:
+    get:
+      summary: Get time-series statistics for chart rendering
+      description: Retrieve time-bucketed analytics (hourly or daily) formatted for populating bar/line charts.
+      operationId: getTimeSeriesStats
+      parameters:
+        - name: domain
+          in: query
+          required: true
+          schema:
+            type: string
+          example: example.com
+          description: Registered domain name to fetch metrics for.
+        - name: period
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              [
+                LAST_24_HOURS,
+                LAST_7_DAYS,
+                LAST_30_DAYS,
+                LAST_6_MONTHS,
+                LAST_12_MONTHS,
+                CUSTOM,
+              ]
+            default: LAST_30_DAYS
+          description: Time range for metrics aggregation.
+        - name: start-date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Required if period is set to `CUSTOM` (YYYY-MM-DD).
+        - name: end-date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Required if period is set to `CUSTOM` (YYYY-MM-DD).
+      responses:
+        "200":
+          description: Time-series metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1TimeSeriesStatsResponse"
+        "401":
+          description: Unauthorized dashboard access
+          content:
+            application/problem+detail:
+              schema:
+                $ref: "#/components/schemas/V1ProblemDetails"
+
 components:
   schemas:
     V1EventPayload:
@@ -196,6 +253,55 @@ components:
           type: number
           format: long
           example: 1.84
+
+    V1TimeSeriesStatsResponse:
+      type: object
+      required:
+        - granularity
+        - from
+        - to
+        - points
+      properties:
+        granularity:
+          type: string
+          enum: [ HOUR, DAY ]
+          example: "DAY"
+          description: Time bucket size used for aggregation.
+        from:
+          type: string
+          format: date-time
+          example: "2026-08-08T00:00:00Z"
+          description: Start timestamp for the queried interval (inclusive).
+        to:
+          type: string
+          format: date-time
+          example: "2026-09-07T23:59:59Z"
+          description: End timestamp for the queried interval (inclusive).
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimeSeriesPoint"
+
+    TimeSeriesPoint:
+      type: object
+      required:
+        - timestamp
+        - pageViews
+        - visitors
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-09-07T00:00:00Z"
+          description: Beginning timestamp of the time bucket.
+        pageViews:
+          type: integer
+          example: 450
+          description: Number of page views recorded within this time bucket.
+        visitors:
+          type: integer
+          example: 120
+          description: Distinct session visitors active within this time bucket.
 
     V1ProblemDetails:
       type: object
