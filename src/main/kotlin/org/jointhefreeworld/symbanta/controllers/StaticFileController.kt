@@ -29,6 +29,9 @@ class StaticFileController {
         val f =
             this::class.java.getResource("/js/symbanta.js") ?: return ResponseEntity.notFound().build()
 
-        return ResponseEntity.ok().body(f.readBytes())
+        return ResponseEntity
+            .ok()
+            .header("Content-Type", "application/javascript")
+            .body(f.readBytes())
     }
 }
