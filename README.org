@@ -14,7 +14,7 @@ Instead of profiling individuals or building invasive cross-site identities, Sym
 
 The server backend is implemented using modern infrastructure designed for high throughput, strict domain isolation, and non-blocking asynchronous processing:
 
-- Telemetry Snippet: Integrating symbanta into your project is extremely lightweight and customizable ✨, even vanilla self-contained JavaScript client (~3KB) containing zero external dependencies.
+- Telemetry Snippet: Integrating symbanta into your project is extremely lightweight and customizable ✨, even See [[file:src/main/resources/js/symbanta.js][vanilla self-contained JavaScript client]] (~3KB) containing zero external dependencies.
 
 - Asynchronous Event Queue: Fire-and-forget background execution implemented via Kotlin Coroutines (=Dispatchers.IO= + =SupervisorJob=). The system immediately acknowledges event receipt (=202 Accepted= or =200 OK=) while database writes occur off the primary HTTP thread pool.
 
@@ -22,22 +22,12 @@ The server backend is implemented using modern infrastructure designed for high 
 
 - REST API Runtime Environment is Java 25 & Kotlin 2.4 built upon Spring Boot 4.1.
 
-- Contract-Driven Interface: OpenAPI 3.0 specification (openapi.yaml) driving automated model and Spring Web controller generation via Fabrikt.
+- Contract-Driven Interface: OpenAPI 3.0 specification ([[file:src/main/resources/openapi.yaml][openapi.yaml]]) driving automated model and Spring Web controller generation via Fabrikt.
 
 -----------------------------
 
 
-[[https://jointhefreeworld.org/static-assets/symbanta/screen-2026-09-08-15-17-45.png]]
-
--------
-
-Client Instrumentation
-
-To instrument a document or web application, include the freedom-respecting telemetry script within your document's <head> element:
-
-#+BEGIN_SRC html
-
-*** Script Configuration Attributes
+* Script Configuration Attributes
 
 | Attribute       | Purpose                                                       | Default Value                         |
 |-----------------+---------------------------------------------------------------+---------------------------------------|
@@ -45,7 +35,21 @@ To instrument a document or web application, include the freedom-respecting tele
 | =data-domain=   | Domain property identifier registered in the database schema | =window.location.hostname=            |
 | =data-interval= | Active session heartbeat rate in milliseconds                 | =4000=                                |
 
-API Specification Summary
+-------
+
+* Client Instrumentation
+
+To instrument a document or web application, include the freedom-respecting telemetry script within your document's <head> element or even somewhere along the end of your body:
+
+#+begin_src html
+<script data-endpoint="http://localhost:8080/v1/events/register" defer
+            src="http://localhost:8080/symbanta.js"></script>
+#+end_src
+
+-------
+
+
+* API Specification Summary
 
 Symbanta exposes a REST API defined at [[file:src/main/resources/openapi.yaml]].
 
