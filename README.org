@@ -8,11 +8,68 @@ Symbanta (Greek: *Συμβάντα*, singular *Συμβάν* / *Symban*) origina
 
 Instead of profiling individuals or building invasive cross-site identities, Symbanta treats data as pure, objective, self-contained system occurrences, moments where intent and action converge. Its open and free ethos honors its Greek roots of public transparency and shared knowledge, giving developers event-driven insights while fully preserving user privacy.
 
+-------------------
+
+* Technical Architecture
+
+The server backend is implemented using modern infrastructure designed for high throughput, strict domain isolation, and non-blocking asynchronous processing:
+
+- Telemetry Snippet: Integrating symbanta into your project is extremely lightweight and customizable ✨, even vanilla self-contained JavaScript client (~3KB) containing zero external dependencies.
+
+- Asynchronous Event Queue: Fire-and-forget background execution implemented via Kotlin Coroutines (=Dispatchers.IO= + =SupervisorJob=). The system immediately acknowledges event receipt (=202 Accepted= or =200 OK=) while database writes occur off the primary HTTP thread pool.
+
+- Storage Layer: PostgreSQL featuring native =jsonb= document support for extensible payload properties, managed strictly via Flyway schema migrations.
+
+- REST API Runtime Environment is Java 25 & Kotlin 2.4 built upon Spring Boot 4.1.
+
+- Contract-Driven Interface: OpenAPI 3.0 specification (openapi.yaml) driving automated model and Spring Web controller generation via Fabrikt.
+
 -----------------------------
+
 
 [[https://jointhefreeworld.org/static-assets/symbanta/screen-2026-09-08-15-17-45.png]]
 
 -------
+
+Client Instrumentation
+
+To instrument a document or web application, include the freedom-respecting telemetry script within your document's <head> element:
+
+#+BEGIN_SRC html
+
+*** Script Configuration Attributes
+
+| Attribute       | Purpose                                                       | Default Value                         |
+|-----------------+---------------------------------------------------------------+---------------------------------------|
+| =data-endpoint= | Absolute HTTP URI of the Symbanta registration service        | =http://localhost:8080/v1/events/register= |
+| =data-domain=   | Domain property identifier registered in the database schema | =window.location.hostname=            |
+| =data-interval= | Active session heartbeat rate in milliseconds                 | =4000=                                |
+
+API Specification Summary
+
+Symbanta exposes a REST API defined at [[file:src/main/resources/openapi.yaml]].
+
+*** Public & Ingestion Routes
+
+=POST /v1/events/register=
+Ingests anonymized user events (=page-view=, =heartbeat=, =visibility-change=).
+
+=GET /symbanta.js=
+Serves the static telemetry client JavaScript snippet.
+
+*** Analytical Dashboard Routes
+
+=GET /v1/properties=
+Lists all domains registered for telemetry tracking.
+
+=GET /v1/stats/summary=
+Calculates privacy-safe metric aggregates (=pageViews=, =visitors=, =bounceRate=, =averageDurationMillis=) over standard periods (=LAST_24_HOURS=, =LAST_7_DAYS=, =LAST_30_DAYS=, =LAST_6_MONTHS=, =LAST_12_MONTHS=, or =CUSTOM=).
+
+=GET /v1/stats/timeseries=
+Outputs time-bucketed (hourly or daily) metrics for graph rendering.
+
+----------------------
+
 
 You can easily register properties in the database like this (with your domain ~localhost~ or ~example.com~ , etc.)
 
@@ -34,6 +91,40 @@ See [[file:./src/main/resources/js/symbanta.js][file:./src/main/resources/js/sym
 #+begin_src html
 <script defer src="http://localhost:8080/symbanta.js" data-endpoint="http://localhost:8080/v1/events/register"></script>
 #+end_src
+
+--------------
+
+* Build System
+
+This project uses Maven
+
+#+begin_src just
+# Compile project sources
+compile:
+    ./mvnw compile
+
+# Run the application locally
+run:
+    ./mvnw spring-boot:run
+
+# Build the package (skip tests) and create artifact
+build:
+    ./mvnw clean package -DskipTests
+
+# Perform full build, run tests, and create artifact
+package:
+    ./mvnw clean package
+
+# Clean up target directories and build artifacts
+clean:
+    ./mvnw clean
+#+end_src
+
+--------
+
+Ensure your PostgreSQL instance is running and accessible via your Spring datasource environment variables !
+
+Database migrations for properties, events, and app_users will execute automatically on application boot via Flyway !
 
 ----------------
 
