@@ -132,6 +132,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/V1ProblemDetails"
 
+  /v1/properties:
+    get:
+      summary: Get registered properties
+      description: Retrieve a list of registered properties (domains) for selection in the dashboard.
+      operationId: getProperties
+      tags:
+        - Properties
+      responses:
+        "200":
+          description: List of registered properties retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1PropertiesResponse"
+        "401":
+          description: Unauthorized access
+          content:
+            application/problem+detail:
+              schema:
+                $ref: "#/components/schemas/V1ProblemDetails"
+
   /v1/stats/summary:
     get:
       summary: Get aggregated site statistics
@@ -374,6 +395,43 @@ components:
           format: long
           example: 1.84
 
+    V1Property:
+      type: object
+      required:
+        - id
+        - domain
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "a8a3a0e6-9e2a-43cf-8a7d-b6a12401f821"
+          description: Unique identifier for the property.
+        domain:
+          type: string
+          example: "example.com"
+          description: Primary domain name registered for analytics tracking.
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-01-15T10:30:00Z"
+          description: Creation timestamp.
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-01-15T10:30:00Z"
+          description: Update timestamp.
+
+    V1PropertiesResponse:
+      type: object
+      required:
+        - properties
+      properties:
+        properties:
+          type: array
+          items:
+            $ref: "#/components/schemas/V1Property"
+
     V1TimeSeriesStatsResponse:
       type: object
       required:
@@ -449,3 +507,4 @@ components:
           format: uri-reference
           example: "/v1/events/register"
           description: A URI reference identifying the specific occurrence of the problem.
+

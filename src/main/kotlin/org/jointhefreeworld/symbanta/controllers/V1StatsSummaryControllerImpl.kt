@@ -33,19 +33,6 @@ const val TIMEZONE = "Europe/Amsterdam"
 
 val ZONE_ID: ZoneId = ZoneId.of(TIMEZONE)
 
-fun instantAtStartOfDay(i: Instant): Instant =
-    LocalDate
-        .ofInstant(i, ZONE_ID)
-        .atStartOfDay(ZONE_ID)
-        .toInstant()
-
-fun instantAtEndOfDay(i: Instant): Instant =
-    LocalDate
-        .ofInstant(i, ZONE_ID)
-        .plusDays(1)
-        .atStartOfDay(ZONE_ID)
-        .toInstant()
-
 @RestController
 class V1StatsSummaryControllerImpl(
     private val analyticsRepository: AnalyticsRepository,
