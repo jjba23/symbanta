@@ -81,6 +81,7 @@ Outputs time-bucketed (hourly or daily) metrics for graph rendering.
 
 [[https://jointhefreeworld.org/static-assets/symbanta/screen-2026-09-08-15-17-45.png]]
 
+
 --------
 
 You can easily register properties in the database like this (with your domain ~localhost~ or ~example.com~ , etc.)
@@ -105,6 +106,27 @@ See [[file:./src/main/resources/js/symbanta.js][file:./src/main/resources/js/sym
 #+end_src
 
 --------------
+
+* Authentication / Authorization
+
+The routes to view analytics for a property are protected by authentications and Spring Web.
+
+You should use the ~/api/auth/login~ route for a session token.
+
+You can take [[symbanta dashboard][https://codeberg.org/jjba23/symbanta-dashboard]] as example in React (Tanstack Query)
+
+You can easily seed some users with different roles using configuration, like in ~application.yaml~
+
+#+begin_src yaml
+application:
+  user-seeder:
+    users:
+      - username: admin
+        password: password123
+        role: ROLE_ADMIN
+#+end_src
+
+------------
 
 * Build System
 
@@ -139,6 +161,10 @@ Ensure your PostgreSQL instance is running and accessible via your Spring dataso
 Database migrations for properties, events, and app_users will execute automatically on application boot via Flyway !
 
 ----------------
+
+[[https://jointhefreeworld.org/static-assets/symbanta/symbanta-small.png]]
+
+---------
 
 * Licensing
 

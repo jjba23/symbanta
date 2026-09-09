@@ -17,6 +17,8 @@
 #
 
 spring:
+  profiles:
+    default: seeder
   main:
     banner-mode: off
   threads:
@@ -38,3 +40,10 @@ management:
     metrics:
       export:
         enabled: false
+
+application:
+  user-seeder:
+    users:
+      - username: admin
+        password: password123
+        role: ROLE_ADMIN
