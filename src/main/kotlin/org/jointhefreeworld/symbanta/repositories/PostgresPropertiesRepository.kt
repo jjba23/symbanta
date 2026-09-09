@@ -23,7 +23,7 @@ import org.jointhefreeworld.symbanta.domain.PropertiesRepository
 import org.jointhefreeworld.symbanta.domain.Property
 import org.jointhefreeworld.symbanta.domain.PropertyId
 import org.springframework.jdbc.core.RowMapper
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
+import org.springframework.jdbc.core.namedparam.EmptySqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -38,11 +38,21 @@ class PostgresPropertiesRepository(
 
     private val propertyRowMapper =
         RowMapper { rs: ResultSet, _ ->
+            // Safely extract PostgreSQL UUID column as java.util.UUID object
+            val uuid =
+                checkNotNull(rs.getObject("id", UUID::class.java)) {
+                    "Property ID cannot be null in database"
+                }
+
+            // Safely extract timestamps handling NULL values or TIMESTAMPTZ columns
+            val createdAtTimestamp = rs.getTimestamp("created_at").toInstant()
+            val updatedAtTimestamp = rs.getTimestamp("updated_at")?.toInstant()
+
             Property(
-                id = PropertyId(UUID.fromString(rs.getString("id"))),
-                domain = rs.getString("domain"),
-                createdAt = rs.getTimestamp("created_at").toInstant(),
-                updatedAt = rs.getTimestamp("updated_at").toInstant(),
+                id = PropertyId(uuid),
+                domain = rs.getString("domain") ?: "",
+                createdAt = createdAtTimestamp,
+                updatedAt = updatedAtTimestamp,
             )
         }
 
@@ -50,13 +60,10 @@ class PostgresPropertiesRepository(
     override fun getProperties(): List<Property> {
         logger.info { "Fetching properties from database" }
 
-        val params =
-            MapSqlParameterSource()
-
         val properties =
             namedParameterJdbcTemplate
-                .query(getPropertiesSql, params, propertyRowMapper)
-
+                .query(getPropertiesSql, EmptySqlParameterSource.INSTANCE, propertyRowMapper)
+        logger.info { "Properties: $properties" }
         return properties
     }
 

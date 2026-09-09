@@ -30,7 +30,6 @@ class SecurityConfig {
                     .anyRequest()
                     .authenticated()
             }
-        // .httpBasic(Customizer.withDefaults())
 
         return http.build()
     }
@@ -72,6 +71,7 @@ class SecurityConfig {
             }
         source.registerCorsConfiguration("/api/auth/**", apiCorsConfig)
         source.registerCorsConfiguration("/v1/stats/**", apiCorsConfig)
+        source.registerCorsConfiguration("/v1/properties", apiCorsConfig)
 
         return source
     }
