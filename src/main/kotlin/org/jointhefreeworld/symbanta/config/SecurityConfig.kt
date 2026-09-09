@@ -3,7 +3,6 @@ package org.jointhefreeworld.symbanta.config
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.authentication.AuthenticationManager
-import org.springframework.security.config.Customizer
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
@@ -24,13 +23,14 @@ class SecurityConfig {
             .cors { it.configurationSource(corsConfigurationSource()) }
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers("/api/auth/**", "/v1/events/register")
+                    .requestMatchers("/api/auth/**", "/v1/events/register", "/symbanta.js", "/error")
                     .permitAll()
                     .requestMatchers("/api/admin/**")
                     .hasAuthority("ROLE_ADMIN")
                     .anyRequest()
                     .authenticated()
-            }.httpBasic(Customizer.withDefaults())
+            }
+        // .httpBasic(Customizer.withDefaults())
 
         return http.build()
     }
@@ -40,18 +40,39 @@ class SecurityConfig {
 
     @Bean
     @Throws(Exception::class)
-    fun authenticationManager(config: AuthenticationConfiguration): AuthenticationManager? = config.getAuthenticationManager()
+    fun authenticationManager(config: AuthenticationConfiguration): AuthenticationManager = config.authenticationManager
 
     @Bean
     fun corsConfigurationSource(): CorsConfigurationSource {
-        val config = CorsConfiguration()
-        config.setAllowedOrigins(listOf("http://localhost:5173", "http://localhost:3000"))
-        config.setAllowedMethods(listOf("GET", "POST", "PUT", "DELETE", "OPTIONS"))
-        config.setAllowedHeaders(listOf("*"))
-        config.allowCredentials = true
+        val source = UrlBasedCorsConfigurationSource()
 
-        val source: UrlBasedCorsConfigurationSource = UrlBasedCorsConfigurationSource()
-        source.registerCorsConfiguration("/**", config)
+        // Analytics ingestion endpoint: Accepts requests from any external website
+        val eventsCorsConfig =
+            CorsConfiguration().apply {
+                allowedOriginPatterns = listOf("*")
+                allowedMethods = listOf("GET", "POST", "OPTIONS")
+                allowedHeaders = listOf("*")
+                allowCredentials = true
+            }
+        source.registerCorsConfiguration("/v1/events/**", eventsCorsConfig)
+
+        // Internal Auth & Admin APIs: Restricted to frontend application domains
+        val apiCorsConfig =
+            CorsConfiguration().apply {
+                allowedOriginPatterns =
+                    listOf(
+                        "http://localhost:5173",
+                        "http://localhost:3000",
+                        "https://symbanta.jointhefreeworld.org",
+                        "https://api.symbanta.jointhefreeworld.org",
+                    )
+                allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                allowedHeaders = listOf("*")
+                allowCredentials = true
+            }
+        source.registerCorsConfiguration("/api/auth/**", apiCorsConfig)
+        source.registerCorsConfiguration("/v1/stats/**", apiCorsConfig)
+
         return source
     }
 }

@@ -49,7 +49,7 @@
     // Safer integer parsing to avoid NaN bypassing the default fallback
     const rawInterval = scriptTag?.getAttribute("data-interval");
     const parsedInterval = rawInterval ? parseInt(rawInterval, 10) : NaN;
-    const HEARTBEAT_INTERVAL_MS = Number.isNaN(parsedInterval) || parsedInterval <= 0 ? 6000 : parsedInterval;
+    const HEARTBEAT_INTERVAL_MS = Number.isNaN(parsedInterval) || parsedInterval <= 0 ? 4000 : parsedInterval;
 
     /**
      * crypto.randomUUID() is only available in secure contexts (HTTPS).
