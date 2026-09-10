@@ -47,3 +47,9 @@ application:
       - username: admin
         password: password123
         role: ROLE_ADMIN
+  property-seeder:
+    properties:
+      - domain: wikimusic.jointhefreeworld.org
+      - domain: jointhefreeworld.org
+      - domain: byggsteg.jointhefreeworld.org
+      - domain: lucidplan.jointhefreeworld.org

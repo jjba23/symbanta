@@ -24,10 +24,12 @@ import org.jointhefreeworld.symbanta.domain.Property
 import org.jointhefreeworld.symbanta.domain.PropertyId
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.namedparam.EmptySqlParameterSource
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
 import java.sql.ResultSet
+import java.sql.Timestamp
 import java.util.*
 
 @Repository
@@ -57,6 +59,30 @@ class PostgresPropertiesRepository(
         }
 
     @Transactional(readOnly = true)
+    override fun findByDomain(domain: String): Property? {
+        logger.info { "Fetching property by domain: $domain" }
+
+        val params = MapSqlParameterSource("domain", domain)
+        return namedParameterJdbcTemplate
+            .query(findByDomainSql, params, propertyRowMapper)
+            .firstOrNull()
+    }
+
+    @Transactional
+    override fun save(property: Property) {
+        logger.info { "Saving property with ID: ${property.id.value}" }
+
+        val params =
+            MapSqlParameterSource()
+                .addValue("id", property.id.value)
+                .addValue("domain", property.domain)
+                .addValue("created_at", Timestamp.from(property.createdAt))
+                .addValue("updated_at", property.updatedAt?.let { Timestamp.from(it) })
+
+        namedParameterJdbcTemplate.update(saveSql, params)
+    }
+
+    @Transactional(readOnly = true)
     override fun getProperties(): List<Property> {
         logger.info { "Fetching properties from database" }
 
@@ -68,6 +94,22 @@ class PostgresPropertiesRepository(
     }
 
     private companion object {
+        val findByDomainSql =
+            """
+            SELECT id, domain, created_at, updated_at
+            FROM properties
+            WHERE domain = :domain
+            """.trimIndent()
+
+        val saveSql =
+            """
+            INSERT INTO properties (id, domain, created_at, updated_at)
+            VALUES (:id, :domain, :created_at, :updated_at)
+            ON CONFLICT (id) DO UPDATE
+            SET domain = EXCLUDED.domain,
+                updated_at = EXCLUDED.updated_at
+            """.trimIndent()
+
         val getPropertiesSql =
             """
             SELECT id, domain, created_at, updated_at FROM properties

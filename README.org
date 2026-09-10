@@ -84,6 +84,12 @@ Outputs time-bucketed (hourly or daily) metrics for graph rendering.
 
 --------
 
+Set the password for the postgres user and create the application database.
+#+begin_src shell
+sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres_password';"
+sudo -u postgres createdb app_db
+#+end_src
+
 You can easily register properties in the database like this (with your domain ~localhost~ or ~example.com~ , etc.)
 
 #+begin_src sql

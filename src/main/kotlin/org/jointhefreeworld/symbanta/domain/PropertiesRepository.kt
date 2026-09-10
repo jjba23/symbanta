@@ -20,4 +20,8 @@ package org.jointhefreeworld.symbanta.domain
 
 interface PropertiesRepository {
     fun getProperties(): List<Property>
+
+    fun findByDomain(domain: String): Property?
+
+    fun save(property: Property)
 }

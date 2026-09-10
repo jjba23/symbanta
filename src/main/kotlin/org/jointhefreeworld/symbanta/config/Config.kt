@@ -21,3 +21,12 @@ data class UserSeederConfigItem(
     val password: String,
     val role: String,
 )
+
+@ConfigurationProperties(prefix = "application.property-seeder")
+data class PropertySeederConfig(
+    val properties: Set<PropertySeederConfigItem>,
+)
+
+data class PropertySeederConfigItem(
+    val domain: String,
+)
