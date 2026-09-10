@@ -51,5 +51,6 @@ application:
     properties:
       - domain: wikimusic.jointhefreeworld.org
       - domain: jointhefreeworld.org
+      # - domain: localhost
       - domain: byggsteg.jointhefreeworld.org
       - domain: lucidplan.jointhefreeworld.org
