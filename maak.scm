@@ -19,11 +19,21 @@
   #:use-module (maak maak)
   #:declarative? #t)
 
-;; ====== Maak constants ======
+;; ====== Configuration ======
 
-;; The TCP port on which the web server will listen.
-(define http-port
-  8080)
+(define http-port 8080)
+
+;; ====== Helpers ======
+
+(define (mvn goal)
+  "Run a Maven GOAL inside the Nix development environment."
+  ($ (list
+      "nix --extra-experimental-features 'nix-command flakes' develop -c"
+      (~ "bash -c './mvnw ~a'" goal))))
+
+(define (run-server)
+  "Run the Spring Boot development server."
+  (mvn "spring-boot:run"))
 
 ;; ====== Maak tasks ======
 
@@ -32,9 +42,13 @@
   ($ '("maak --list")))
 
 (define (fmt)
-  "Format Scheme source code files according to the Guix style guide."
-  ($ '("nix --extra-experimental-features 'nix-command flakes'"
-                                 "develop -c" "bash -c './mvnw ktlint:format'")))
+  "Format Kotlin source code."
+  (mvn "ktlint:format"))
+
+(define (lint)
+  "Lint Kotlin source code."
+  (fmt)
+  (mvn "ktlint:check"))
 
 (define (kill-server)
   "Kill any running HTTP server in the same port."
@@ -42,15 +56,11 @@
   ($ '("sleep 2")))
 
 (define (server)
-  "Target to start the symbanta server with the default configuration."
+  "Start the symbanta server with the default configuration."
   (kill-server)
-  ($ '("nix --extra-experimental-features 'nix-command flakes'"
-                                 "develop -c"
-                                 "bash -c './mvnw spring-boot:run'")))
+  (run-server))
 
 (define (production-server)
-  "Target to start the symbanta server with the production configuration."
+  "Start the symbanta server with the production configuration."
   (kill-server)
-  ($ '("nix --extra-experimental-features 'nix-command flakes'"
-                                 "develop -c"
-                                 "bash -c './mvnw spring-boot:run'")))
+  (run-server))
