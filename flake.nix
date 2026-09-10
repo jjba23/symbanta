@@ -39,6 +39,7 @@
             yaml-language-server
             darkhttpd
             watchexec
+            maven
           ];
           JAVA_HOME = "${pkgs.jdk25}";
           shellHook = ''
