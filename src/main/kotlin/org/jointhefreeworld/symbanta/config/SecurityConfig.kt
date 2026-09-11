@@ -1,5 +1,6 @@
 package org.jointhefreeworld.symbanta.config
 
+import org.jointhefreeworld.symbanta.UserDetailsService
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.authentication.AuthenticationManager
@@ -15,7 +16,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 
 @Configuration
 @EnableWebSecurity
-class SecurityConfig {
+class SecurityConfig(
+    private val userDetailsService: UserDetailsService,
+) {
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         http
@@ -24,6 +27,7 @@ class SecurityConfig {
             .sessionManagement { session -> session.maximumSessions(1).maxSessionsPreventsLogin(false) }
             .rememberMe { rememberMe ->
                 rememberMe
+                    .userDetailsService(userDetailsService)
                     .key("uniqueAndSecretKey")
                     .tokenValiditySeconds(30 * 24 * 60 * 60)
             }.authorizeHttpRequests { auth ->
