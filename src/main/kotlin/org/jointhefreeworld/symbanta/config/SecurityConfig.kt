@@ -21,7 +21,6 @@ class SecurityConfig {
         http
             .csrf { it.disable() }
             .cors { it.configurationSource(corsConfigurationSource()) }
-            .sessionManagement { session -> session.maximumSessions(1).maxSessionsPreventsLogin(false) }
             .authorizeHttpRequests { auth ->
                 auth
                     .requestMatchers("/api/auth/**", "/v1/events/register", "/symbanta.js", "/error")
