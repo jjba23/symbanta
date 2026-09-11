@@ -13,7 +13,7 @@ class ClockConfig {
 
 @ConfigurationProperties(prefix = "application.user-seeder")
 data class UserSeederConfig(
-    val users: Set<UserSeederConfigItem>,
+    val users: Set<UserSeederConfigItem> = setOf(),
 )
 
 data class UserSeederConfigItem(
@@ -24,7 +24,7 @@ data class UserSeederConfigItem(
 
 @ConfigurationProperties(prefix = "application.property-seeder")
 data class PropertySeederConfig(
-    val properties: Set<PropertySeederConfigItem>,
+    val properties: Set<PropertySeederConfigItem> = setOf(),
 )
 
 data class PropertySeederConfigItem(
