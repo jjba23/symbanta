@@ -21,7 +21,12 @@ class SecurityConfig {
         http
             .csrf { it.disable() }
             .cors { it.configurationSource(corsConfigurationSource()) }
-            .authorizeHttpRequests { auth ->
+            .sessionManagement { session -> session.maximumSessions(1).maxSessionsPreventsLogin(false) }
+            .rememberMe { rememberMe ->
+                rememberMe
+                    .key("uniqueAndSecretKey")
+                    .tokenValiditySeconds(30 * 24 * 60 * 60)
+            }.authorizeHttpRequests { auth ->
                 auth
                     .requestMatchers("/api/auth/**", "/v1/events/register", "/symbanta.js", "/error")
                     .permitAll()

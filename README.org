@@ -53,6 +53,14 @@ To instrument a document or web application, include the freedom-respecting tele
 
 -------
 
+* Example of projects that use Symbanta (instrumented)
+
+- WikiMusic: https://codeberg.org/jjba23/wikimusic
+- Join the free World: https://codeberg.org/jjba23/jointhefreeworld
+- LucidPlan: https://codeberg.org/jjba23/lucidplan
+
+-----
+
 
 * API Specification Summary
 
