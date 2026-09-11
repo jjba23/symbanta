@@ -134,7 +134,7 @@ VALUES (
 
 The routes to view analytics for a property are protected by authentications and Spring Web.
 
-You should use the ~/api/auth/login~ route for a session token.
+You should use the ~/auth/login~ route for a session token.
 
 You can take [[symbanta dashboard][https://codeberg.org/jjba23/symbanta-dashboard]] as example in React (Tanstack Query)
 

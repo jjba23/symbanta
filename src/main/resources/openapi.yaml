@@ -32,7 +32,7 @@ servers:
     description: Production Server
 
 paths:
-  /api/auth/login:
+  /auth/login:
     post:
       summary: User login
       description: Authenticates user credentials and establishes a session cookie.
@@ -64,7 +64,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/V1ProblemDetails"
 
-  /api/auth/logout:
+  /auth/logout:
     post:
       summary: User logout
       description: Invalidates the current session and clears the security context.
@@ -79,7 +79,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
 
-  /api/auth/me:
+  /auth/me:
     get:
       summary: Get currently authenticated user details
       description: Checks current session status and returns user credentials if authenticated.

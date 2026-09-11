@@ -25,9 +25,9 @@ class SecurityConfig {
             .cors { it.configurationSource(corsConfigurationSource()) }
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers("/api/auth/**", "/v1/events/register", "/symbanta.js", "/error")
+                    .requestMatchers("/auth/**", "/v1/events/register", "/symbanta.js", "/error")
                     .permitAll()
-                    .requestMatchers("/api/admin/**")
+                    .requestMatchers("/admin/**")
                     .hasAuthority("ROLE_ADMIN")
                     .anyRequest()
                     .authenticated()
@@ -81,7 +81,7 @@ class SecurityConfig {
                 allowedHeaders = listOf("*")
                 allowCredentials = true
             }
-        source.registerCorsConfiguration("/api/auth/**", apiCorsConfig)
+        source.registerCorsConfiguration("/auth/**", apiCorsConfig)
         source.registerCorsConfiguration("/v1/stats/**", apiCorsConfig)
         source.registerCorsConfiguration("/v1/properties", apiCorsConfig)
 
