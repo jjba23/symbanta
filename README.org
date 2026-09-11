@@ -114,7 +114,7 @@ You can easily register properties in the database like this (with your domain ~
 #+begin_src yaml
 application:
   property-seeder:
-    users:
+    properties:
       - domain: example.com
 #+end_src
 
