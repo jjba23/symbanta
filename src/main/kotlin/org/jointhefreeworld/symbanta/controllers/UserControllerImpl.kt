@@ -7,9 +7,11 @@ import org.jointhefreeworld.symbanta.openapi.controllers.ApiAuthLogoutController
 import org.jointhefreeworld.symbanta.openapi.controllers.ApiAuthMeController
 import org.jointhefreeworld.symbanta.openapi.models.AuthResponseDto
 import org.jointhefreeworld.symbanta.openapi.models.LoginRequestDto
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.AuthenticationException
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.annotation.*
 
@@ -26,9 +28,13 @@ class UserControllerImpl(
         @RequestBody loginRequest: LoginRequestDto,
     ): ResponseEntity<AuthResponseDto> {
         val authentication =
-            authenticationManager.authenticate(
-                UsernamePasswordAuthenticationToken(loginRequest.username, loginRequest.password),
-            )
+            try {
+                authenticationManager.authenticate(
+                    UsernamePasswordAuthenticationToken(loginRequest.username, loginRequest.password),
+                )
+            } catch (e: AuthenticationException) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+            }
 
         val context = SecurityContextHolder.createEmptyContext()
         context.authentication = authentication

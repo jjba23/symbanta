@@ -41,6 +41,18 @@ management:
       export:
         enabled: false
 
+server:
+  error:
+    include-stacktrace: always
+
+logging:
+  level:
+    org:
+      springframework:
+        web: DEBUG
+        security: DEBUG
+
+
 application:
   user-seeder:
     users:
