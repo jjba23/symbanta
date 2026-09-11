@@ -87,11 +87,6 @@ Outputs time-bucketed (hourly or daily) metrics for graph rendering.
 
 ----------------------
 
-[[https://jointhefreeworld.org/static-assets/symbanta/screen-2026-09-11-15-09-55.png]]
-
---------
-
-
 * Instrumenting
 
 On the client side, simply load the ~symbanta~ script instrumentation in a page and all will work out-of-the-box. Configuration is done via the ~data~ tags.
@@ -103,8 +98,6 @@ See [[file:./src/main/resources/js/symbanta.js][file:./src/main/resources/js/sym
 #+end_src
 
 --------------
-
------
 
 * Properties
 
@@ -149,6 +142,10 @@ application:
 #+end_src
 
 ------------
+
+[[https://jointhefreeworld.org/static-assets/symbanta/screen-2026-09-11-15-09-55.png]]
+
+--------
 
 * Build System
 
