@@ -66,6 +66,12 @@ data class StatsSummary(
     val averageDurationMillis: BigDecimal,
 )
 
+data class UserAgentStat(
+    val userAgent: String,
+    val pageViews: Long,
+    val visitors: Long,
+)
+
 enum class TimeGranularity(
     val unit: String,
     val intervalStep: String,

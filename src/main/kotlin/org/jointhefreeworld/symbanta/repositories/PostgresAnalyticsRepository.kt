@@ -185,6 +185,40 @@ class PostgresAnalyticsRepository(
             property
         }
 
+    private val userAgentStatRowMapper =
+        RowMapper { rs: ResultSet, _ ->
+            UserAgentStat(
+                userAgent = rs.getString("user_agent") ?: "Unknown",
+                pageViews = rs.getLong("page_views"),
+                visitors = rs.getLong("visitors"),
+            )
+        }
+
+    @Transactional(readOnly = true)
+    override fun getUserAgentStats(
+        domain: String,
+        from: Instant,
+        to: Instant,
+        limit: Int,
+    ): List<UserAgentStat> =
+        withLoggingContext(
+            "domain" to domain,
+            "from" to from.toString(),
+            "to" to to.toString(),
+            "limit" to limit.toString(),
+        ) {
+            logger.info { "Fetching top user agents breakdown from database" }
+
+            val params =
+                MapSqlParameterSource()
+                    .addValue("domain", domain)
+                    .addValue("from", Timestamp.from(from))
+                    .addValue("to", Timestamp.from(to))
+                    .addValue("limit", limit)
+
+            namedParameterJdbcTemplate.query(getUserAgentStatsSql, params, userAgentStatRowMapper)
+        }
+
     private companion object {
         val saveEventSql =
             """
@@ -295,6 +329,23 @@ class PostgresAnalyticsRepository(
             FROM time_buckets tb
             LEFT JOIN aggregated_events ae ON tb.bucket = ae.bucket
             ORDER BY tb.bucket ASC;
+            """.trimIndent()
+
+        val getUserAgentStatsSql =
+            """
+            WITH target_property AS (
+                SELECT id FROM properties WHERE domain = :domain
+            )
+            SELECT
+                COALESCE(e.user_agent, 'Unknown') AS user_agent,
+                COUNT(*) FILTER (WHERE e.event_name = 'page-view') AS page_views,
+                COUNT(DISTINCT e.session_id) AS visitors
+            FROM events e
+            JOIN target_property tp ON e.property_id = tp.id
+            WHERE e.created_at >= :from AND e.created_at <= :to
+            GROUP BY e.user_agent
+            ORDER BY page_views DESC
+            LIMIT :limit;
             """.trimIndent()
     }
 }

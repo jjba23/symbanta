@@ -37,4 +37,11 @@ interface AnalyticsRepository {
         to: Instant,
         granularity: TimeGranularity,
     ): List<TimeSeriesPoint>
+
+    fun getUserAgentStats(
+        domain: String,
+        from: Instant,
+        to: Instant,
+        limit: Int = 10,
+    ): List<UserAgentStat>
 }
