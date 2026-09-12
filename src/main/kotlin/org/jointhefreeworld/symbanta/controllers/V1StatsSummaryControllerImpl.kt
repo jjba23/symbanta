@@ -25,13 +25,7 @@ import org.jointhefreeworld.symbanta.openapi.models.V1StatsSummaryResponseDto
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.RestController
 import java.time.Clock
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
-
-const val TIMEZONE = "Europe/Amsterdam"
-
-val ZONE_ID: ZoneId = ZoneId.of(TIMEZONE)
 
 @RestController
 class V1StatsSummaryControllerImpl(
@@ -44,34 +38,9 @@ class V1StatsSummaryControllerImpl(
         startDate: LocalDate?,
         endDate: LocalDate?,
     ): ResponseEntity<V1StatsSummaryResponseDto> {
-        val now = clock.instant()
-        val zdt = now.atZone(ZONE_ID)
-
-        val from: Instant =
-            if (period == PeriodDto.CUSTOM) {
-                checkNotNull(startDate).atStartOfDay(ZONE_ID).toInstant()
-            } else {
-                when (period) {
-                    PeriodDto.LAST_12_MONTHS -> zdt.minusMonths(12).toInstant()
-                    PeriodDto.LAST_6_MONTHS -> zdt.minusMonths(6).toInstant()
-                    PeriodDto.LAST_30_DAYS -> zdt.minusDays(30).toInstant()
-                    PeriodDto.LAST_7_DAYS -> zdt.minusDays(7).toInstant()
-                    PeriodDto.LAST_24_HOURS -> zdt.minusHours(24).toInstant()
-                    PeriodDto.CUSTOM -> throw IllegalArgumentException("Custom period requires dates")
-                }
-            }
-
-        val to: Instant =
-            if (period == PeriodDto.CUSTOM) {
-                checkNotNull(endDate)
-                    .plusDays(1)
-                    .atStartOfDay(ZONE_ID)
-                    .toInstant()
-            } else {
-                now
-            }
-
+        val (from, to) = PeriodResolver.resolve(period, startDate, endDate, clock)
         val summary = analyticsRepository.getStatsSummary(domain = domain, from = from, to = to)
+
         return ResponseEntity.ok(
             V1StatsSummaryResponseDto(
                 pageViews = summary.pageViews.toInt(),

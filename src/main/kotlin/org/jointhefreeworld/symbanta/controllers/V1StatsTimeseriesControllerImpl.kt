@@ -21,13 +21,14 @@ package org.jointhefreeworld.symbanta.controllers
 import org.jointhefreeworld.symbanta.domain.AnalyticsRepository
 import org.jointhefreeworld.symbanta.domain.TimeGranularity
 import org.jointhefreeworld.symbanta.openapi.controllers.V1StatsTimeseriesController
-import org.jointhefreeworld.symbanta.openapi.models.PeriodDtoExtra
+import org.jointhefreeworld.symbanta.openapi.models.PeriodDto
 import org.jointhefreeworld.symbanta.openapi.models.TimeSeriesPointDto
 import org.jointhefreeworld.symbanta.openapi.models.V1TimeSeriesStatsResponseDto
 import org.jointhefreeworld.symbanta.openapi.models.V1TimeSeriesStatsResponseDtoGranularityDto
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.RestController
-import java.time.*
+import java.time.Clock
+import java.time.LocalDate
 
 @RestController
 class V1StatsTimeseriesControllerImpl(
@@ -36,15 +37,12 @@ class V1StatsTimeseriesControllerImpl(
 ) : V1StatsTimeseriesController {
     override fun getTimeSeriesStats(
         domain: String,
-        period: PeriodDtoExtra,
+        period: PeriodDto,
         startDate: LocalDate?,
         endDate: LocalDate?,
     ): ResponseEntity<V1TimeSeriesStatsResponseDto> {
-        val now = clock.instant()
-        val zoneId = ZoneId.of(TIMEZONE)
-
-        val (from, to) = resolveTimeRange(period, startDate, endDate, now, zoneId)
-        val granularity = resolveGranularity(period, from, to)
+        val (from, to) = PeriodResolver.resolve(period, startDate, endDate, clock)
+        val granularity = PeriodResolver.resolveGranularity(period, from, to)
 
         val points =
             analyticsRepository.getTimeSeriesStats(
@@ -54,9 +52,15 @@ class V1StatsTimeseriesControllerImpl(
                 granularity = granularity,
             )
 
-        val response =
+        val dtoGranularity =
+            when (granularity) {
+                TimeGranularity.HOUR -> V1TimeSeriesStatsResponseDtoGranularityDto.HOUR
+                TimeGranularity.DAY -> V1TimeSeriesStatsResponseDtoGranularityDto.DAY
+            }
+
+        return ResponseEntity.ok(
             V1TimeSeriesStatsResponseDto(
-                granularity = V1TimeSeriesStatsResponseDtoGranularityDto.DAY,
+                granularity = dtoGranularity,
                 from = from,
                 to = to,
                 points =
@@ -67,67 +71,7 @@ class V1StatsTimeseriesControllerImpl(
                             visitors = point.visitors.toInt(),
                         )
                     },
-            )
-
-        return ResponseEntity.ok(response)
+            ),
+        )
     }
-
-    private fun resolveTimeRange(
-        period: PeriodDtoExtra,
-        startDate: LocalDate?,
-        endDate: LocalDate?,
-        now: Instant,
-        zoneId: ZoneId,
-    ): Pair<Instant, Instant> {
-        val zdt = now.atZone(zoneId)
-
-        val from: Instant =
-            if (period == PeriodDtoExtra.CUSTOM) {
-                checkNotNull(startDate).atStartOfDay(zoneId).toInstant()
-            } else {
-                when (period) {
-                    PeriodDtoExtra.LAST_24_HOURS -> zdt.minusHours(24).toInstant()
-                    PeriodDtoExtra.LAST_7_DAYS -> zdt.minusDays(7).toInstant()
-                    PeriodDtoExtra.LAST_30_DAYS -> zdt.minusDays(30).toInstant()
-                    PeriodDtoExtra.LAST_6_MONTHS -> zdt.minusMonths(6).toInstant()
-                    PeriodDtoExtra.LAST_12_MONTHS -> zdt.minusMonths(12).toInstant()
-                    PeriodDtoExtra.CUSTOM -> error("Handled above")
-                }
-            }
-
-        val to: Instant =
-            if (period == PeriodDtoExtra.CUSTOM) {
-                checkNotNull(endDate).plusDays(1).atStartOfDay(zoneId).toInstant()
-            } else {
-                now
-            }
-
-        return Pair(from, to)
-    }
-
-    private fun resolveGranularity(
-        period: PeriodDtoExtra,
-        from: Instant,
-        to: Instant,
-    ): TimeGranularity =
-        when (period) {
-            PeriodDtoExtra.LAST_24_HOURS -> {
-                TimeGranularity.HOUR
-            }
-
-            PeriodDtoExtra.CUSTOM -> {
-                if (Duration
-                        .between(from, to)
-                        .toHours() <= 48
-                ) {
-                    TimeGranularity.HOUR
-                } else {
-                    TimeGranularity.DAY
-                }
-            }
-
-            else -> {
-                TimeGranularity.DAY
-            }
-        }
 }

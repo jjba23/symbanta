@@ -1,5 +1,5 @@
 # symbanta
-
+#
 # Copyright © Josep Bigorra <jjbigorra@gmail.com>
 #
 # symbanta is free software: you can redistribute it and/or modify
@@ -100,6 +100,60 @@ paths:
               schema:
                 $ref: "#/components/schemas/V1ProblemDetails"
 
+  /v1/stats/user-agents:
+    get:
+      summary: Get user agent breakdown statistics
+      description: Retrieve aggregated metrics (page views and unique visitors) grouped by user agent string for a given domain.
+      operationId: getUserAgentStats
+      parameters:
+        - name: domain
+          in: query
+          required: true
+          schema:
+            type: string
+          example: example.com
+          description: Registered domain name to fetch metrics for.
+        - name: period
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/Period"
+          description: Time range for metrics aggregation.
+        - name: start-date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Required if period is set to `CUSTOM` (YYYY-MM-DD).
+        - name: end-date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Required if period is set to `CUSTOM` (YYYY-MM-DD).
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+          description: Maximum number of user agents to return (ordered by top page views).
+      responses:
+        "200":
+          description: User agent statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1UserAgentStatsResponse"
+        "401":
+          description: Unauthorized dashboard access
+          content:
+            application/problem+detail:
+              schema:
+                $ref: "#/components/schemas/V1ProblemDetails"
+
   /v1/events/register:
     post:
       summary: Register an event
@@ -170,17 +224,7 @@ paths:
           in: query
           required: false
           schema:
-            type: string
-            enum:
-              [
-                LAST_24_HOURS,
-                LAST_7_DAYS,
-                LAST_30_DAYS,
-                LAST_6_MONTHS,
-                LAST_12_MONTHS,
-                CUSTOM,
-              ]
-            default: LAST_30_DAYS
+            $ref: "#/components/schemas/Period"
           description: Time range for aggregated metrics.
         - name: start-date
           in: query
@@ -227,17 +271,7 @@ paths:
           in: query
           required: false
           schema:
-            type: string
-            enum:
-              [
-                LAST_24_HOURS,
-                LAST_7_DAYS,
-                LAST_30_DAYS,
-                LAST_6_MONTHS,
-                LAST_12_MONTHS,
-                CUSTOM,
-              ]
-            default: LAST_30_DAYS
+            $ref: "#/components/schemas/Period"
           description: Time range for metrics aggregation.
         - name: start-date
           in: query
@@ -269,6 +303,26 @@ paths:
 
 components:
   schemas:
+    Period:
+      type: string
+      default: LAST_7_DAYS
+      description: Time range for aggregated metrics generation.
+      enum:
+        - TODAY
+        - YESTERDAY
+        - LAST_24_HOURS
+        - LAST_3_DAYS
+        - LAST_7_DAYS
+        - LAST_30_DAYS
+        - THIS_MONTH
+        - LAST_MONTH
+        - LAST_6_MONTHS
+        - LAST_12_MONTHS
+        - THIS_YEAR
+        - LAST_YEAR
+        - ALL_TIME
+        - CUSTOM
+
     LoginRequest:
       type: object
       required:
@@ -481,6 +535,48 @@ components:
           example: 120
           description: Distinct session visitors active within this time bucket.
 
+    V1UserAgentStat:
+      type: object
+      required:
+        - userAgent
+        - pageViews
+        - visitors
+      properties:
+        userAgent:
+          type: string
+          example: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+          description: Raw or normalized browser user agent string.
+        pageViews:
+          type: integer
+          example: 1450
+          description: Total page views associated with this user agent.
+        visitors:
+          type: integer
+          example: 320
+          description: Distinct session visitors using this user agent.
+
+    V1UserAgentStatsResponse:
+      type: object
+      required:
+        - from
+        - to
+        - items
+      properties:
+        from:
+          type: string
+          format: date-time
+          example: "2026-08-08T08:49:28Z"
+          description: Start timestamp for the aggregated metrics period (inclusive).
+        to:
+          type: string
+          format: date-time
+          example: "2026-09-07T08:49:28Z"
+          description: End timestamp for the aggregated metrics period (inclusive).
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/V1UserAgentStat"
+
     V1ProblemDetails:
       type: object
       description: Standard RFC 7807 / RFC 9457 Problem Details response object.
@@ -507,4 +603,3 @@ components:
           format: uri-reference
           example: "/v1/events/register"
           description: A URI reference identifying the specific occurrence of the problem.
-
