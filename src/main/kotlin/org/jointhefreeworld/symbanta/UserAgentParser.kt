@@ -42,7 +42,7 @@ object UserAgentParser {
             os != null && browser != null -> "$os, $browser"
             os != null -> os
             browser != null -> browser
-            else -> "Other"
+            else -> ua
         }
     }
 }
