@@ -13,6 +13,8 @@ object UserAgentParser {
         if (lowerUa.contains("duckduckbot")) return "DuckDuckBot"
         if (lowerUa.contains("sogou web spider")) return "Sogou Web Spider"
         if (lowerUa.contains("googlebot")) return "Googlebot"
+        if (lowerUa.contains("baiduspider")) return "Baidu Spider"
+        if (lowerUa.contains("ahrefsbot")) return "Ahrefs Bot"
 
         // Detect Operating System
         val os =
