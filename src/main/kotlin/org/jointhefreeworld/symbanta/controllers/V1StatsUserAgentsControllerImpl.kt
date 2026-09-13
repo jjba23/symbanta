@@ -18,6 +18,7 @@
 
 package org.jointhefreeworld.symbanta.controllers
 
+import org.jointhefreeworld.symbanta.UserAgentParser
 import org.jointhefreeworld.symbanta.domain.AnalyticsRepository
 import org.jointhefreeworld.symbanta.openapi.controllers.V1StatsUserAgentsController
 import org.jointhefreeworld.symbanta.openapi.models.PeriodDto
@@ -36,7 +37,6 @@ class V1StatsUserAgentsControllerImpl(
     override fun getUserAgentStats(
         domain: String,
         period: PeriodDto,
-        limit: Int,
         startDate: LocalDate?,
         endDate: LocalDate?,
     ): ResponseEntity<V1UserAgentStatsResponseDto> {
@@ -47,23 +47,23 @@ class V1StatsUserAgentsControllerImpl(
                 domain = domain,
                 from = from,
                 to = to,
-                limit = limit,
             )
 
-        val items =
-            stats.map { stat ->
-                V1UserAgentStatDto(
-                    userAgent = stat.userAgent,
-                    pageViews = stat.pageViews.toInt(),
-                    visitors = stat.visitors.toInt(),
-                )
-            }
-
+        val aggregatedItems =
+            stats
+                .groupBy { UserAgentParser.parse(it.userAgent) }
+                .map { (parsedLabel, group) ->
+                    V1UserAgentStatDto(
+                        userAgent = parsedLabel,
+                        pageViews = group.sumOf { it.pageViews.toInt() },
+                        visitors = group.sumOf { it.visitors.toInt() },
+                    )
+                }.sortedByDescending { it.pageViews }
         return ResponseEntity.ok(
             V1UserAgentStatsResponseDto(
                 from = from,
                 to = to,
-                items = items,
+                items = aggregatedItems,
             ),
         )
     }

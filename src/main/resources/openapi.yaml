@@ -133,13 +133,6 @@ paths:
             type: string
             format: date
           description: Required if period is set to `CUSTOM` (YYYY-MM-DD).
-        - name: limit
-          in: query
-          required: false
-          schema:
-            type: integer
-            default: 10
-          description: Maximum number of user agents to return (ordered by top page views).
       responses:
         "200":
           description: User agent statistics retrieved successfully

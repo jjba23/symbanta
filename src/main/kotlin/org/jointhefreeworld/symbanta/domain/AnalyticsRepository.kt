@@ -42,6 +42,5 @@ interface AnalyticsRepository {
         domain: String,
         from: Instant,
         to: Instant,
-        limit: Int = 10,
     ): List<UserAgentStat>
 }

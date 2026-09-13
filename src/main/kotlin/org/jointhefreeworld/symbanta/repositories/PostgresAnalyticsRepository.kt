@@ -199,13 +199,11 @@ class PostgresAnalyticsRepository(
         domain: String,
         from: Instant,
         to: Instant,
-        limit: Int,
     ): List<UserAgentStat> =
         withLoggingContext(
             "domain" to domain,
             "from" to from.toString(),
             "to" to to.toString(),
-            "limit" to limit.toString(),
         ) {
             logger.info { "Fetching top user agents breakdown from database" }
 
@@ -214,7 +212,6 @@ class PostgresAnalyticsRepository(
                     .addValue("domain", domain)
                     .addValue("from", Timestamp.from(from))
                     .addValue("to", Timestamp.from(to))
-                    .addValue("limit", limit)
 
             namedParameterJdbcTemplate.query(getUserAgentStatsSql, params, userAgentStatRowMapper)
         }
@@ -344,8 +341,7 @@ class PostgresAnalyticsRepository(
             JOIN target_property tp ON e.property_id = tp.id
             WHERE e.created_at >= :from AND e.created_at <= :to
             GROUP BY e.user_agent
-            ORDER BY page_views DESC
-            LIMIT :limit;
+            ORDER BY page_views DESC;
             """.trimIndent()
     }
 }
