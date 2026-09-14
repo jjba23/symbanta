@@ -43,4 +43,10 @@ interface AnalyticsRepository {
         from: Instant,
         to: Instant,
     ): List<UserAgentStat>
+
+    fun getScreenSizeStats(
+        domain: String,
+        from: Instant,
+        to: Instant,
+    ): List<ScreenSizeStat>
 }

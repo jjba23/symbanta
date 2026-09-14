@@ -72,6 +72,13 @@ data class UserAgentStat(
     val visitors: Long,
 )
 
+data class ScreenSizeStat(
+    val width: Int,
+    val height: Int,
+    val pageViews: Long,
+    val visitors: Long,
+)
+
 enum class TimeGranularity(
     val unit: String,
     val intervalStep: String,

@@ -1,20 +1,20 @@
 /* symbanta
-*
-* Copyright © Josep Bigorra <jjbigorra@gmail.com>
-*
-* symbanta is free software: you can redistribute it and/or modify
-* it under the terms of the GNU Affero General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* symbanta is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Affero General Public License for more details.
-*
-* You should have received a copy of the GNU Affero General Public License
-* along with symbanta.  If not, see <https://www.gnu.org/licenses/>.
-*/
+ *
+ * Copyright © Josep Bigorra <jjbigorra@gmail.com>
+ *
+ * symbanta is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * symbanta is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with symbanta.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 package org.jointhefreeworld.symbanta.repositories
 
@@ -185,6 +185,38 @@ class PostgresAnalyticsRepository(
             property
         }
 
+    private val screenSizeStatRowMapper =
+        RowMapper { rs: ResultSet, _ ->
+            ScreenSizeStat(
+                width = rs.getInt("width"),
+                height = rs.getInt("height"),
+                pageViews = rs.getLong("page_views"),
+                visitors = rs.getLong("visitors"),
+            )
+        }
+
+    @Transactional(readOnly = true)
+    override fun getScreenSizeStats(
+        domain: String,
+        from: Instant,
+        to: Instant,
+    ): List<ScreenSizeStat> =
+        withLoggingContext(
+            "domain" to domain,
+            "from" to from.toString(),
+            "to" to to.toString(),
+        ) {
+            logger.info { "Fetching top screen sizes breakdown from database" }
+
+            val params =
+                MapSqlParameterSource()
+                    .addValue("domain", domain)
+                    .addValue("from", Timestamp.from(from))
+                    .addValue("to", Timestamp.from(to))
+
+            namedParameterJdbcTemplate.query(getScreenSizeStatsSql, params, screenSizeStatRowMapper)
+        }
+
     private val userAgentStatRowMapper =
         RowMapper { rs: ResultSet, _ ->
             UserAgentStat(
@@ -326,6 +358,25 @@ class PostgresAnalyticsRepository(
             FROM time_buckets tb
             LEFT JOIN aggregated_events ae ON tb.bucket = ae.bucket
             ORDER BY tb.bucket ASC;
+            """.trimIndent()
+
+        val getScreenSizeStatsSql =
+            """
+            WITH target_property AS (
+                SELECT id FROM properties WHERE domain = :domain
+            )
+            SELECT
+                e.screen_width AS width,
+                e.screen_height AS height,
+                COUNT(*) FILTER (WHERE e.event_name = 'page-view') AS page_views,
+                COUNT(DISTINCT e.session_id) AS visitors
+            FROM events e
+            JOIN target_property tp ON e.property_id = tp.id
+            WHERE e.created_at >= :from AND e.created_at <= :to
+              AND e.screen_width IS NOT NULL
+              AND e.screen_height IS NOT NULL
+            GROUP BY e.screen_width, e.screen_height
+            ORDER BY page_views DESC;
             """.trimIndent()
 
         val getUserAgentStatsSql =

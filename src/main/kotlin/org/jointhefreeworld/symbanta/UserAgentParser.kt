@@ -38,7 +38,9 @@ object UserAgentParser {
 
                 lowerUa.contains(
                     "meta-externalagent",
-                ) || lowerUa.contains("meta-webindexer") || lowerUa.contains("facebookexternalhit") -> "Meta Crawler"
+                ) ||
+                    lowerUa.contains("meta-webindexer") ||
+                    lowerUa.contains("facebookexternalhit") -> "Meta Crawler"
 
                 lowerUa.contains("twitterbot") -> "Twitter / X Bot"
 
