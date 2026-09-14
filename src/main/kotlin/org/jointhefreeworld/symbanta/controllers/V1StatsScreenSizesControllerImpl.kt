@@ -52,8 +52,7 @@ class V1StatsScreenSizesControllerImpl(
         val aggregatedItems =
             ScreenSizeMapper.aggregate(rawStats).map { stat ->
                 V1ScreenSizeStatDto(
-                    width = stat.width,
-                    height = stat.height,
+                    size = stat.size,
                     pageViews = stat.pageViews.toInt(),
                     visitors = stat.visitors.toInt(),
                 )

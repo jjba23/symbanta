@@ -578,19 +578,14 @@ components:
     V1ScreenSizeStat:
       type: object
       required:
-        - width
-        - height
+        - size
         - pageViews
         - visitors
       properties:
-        width:
-          type: integer
-          example: 1920
-          description: Screen width in pixels.
-        height:
-          type: integer
-          example: 1080
-          description: Screen height in pixels.
+        size:
+          type: string
+          example: "Full HD"
+          description: Screen size.
         pageViews:
           type: integer
           example: 1450

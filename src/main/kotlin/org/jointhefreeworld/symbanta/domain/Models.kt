@@ -79,6 +79,12 @@ data class ScreenSizeStat(
     val visitors: Long,
 )
 
+data class ScreenSizeGroupStat(
+    val size: String,
+    val pageViews: Long,
+    val visitors: Long,
+)
+
 enum class TimeGranularity(
     val unit: String,
     val intervalStep: String,

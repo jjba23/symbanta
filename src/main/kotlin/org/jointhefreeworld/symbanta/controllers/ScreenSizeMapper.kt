@@ -18,6 +18,7 @@
 
 package org.jointhefreeworld.symbanta
 
+import org.jointhefreeworld.symbanta.domain.ScreenSizeGroupStat
 import org.jointhefreeworld.symbanta.domain.ScreenSizeStat
 
 /**
@@ -63,13 +64,12 @@ object ScreenSizeMapper {
         }
     }
 
-    fun aggregate(stats: List<ScreenSizeStat>): List<ScreenSizeStat> =
+    fun aggregate(stats: List<ScreenSizeStat>): List<ScreenSizeGroupStat> =
         stats
             .groupBy { mapToBucket(it.width, it.height) }
             .map { (bucket, group) ->
-                ScreenSizeStat(
-                    width = bucket.nominalWidth,
-                    height = bucket.nominalHeight,
+                ScreenSizeGroupStat(
+                    size = bucket.label,
                     pageViews = group.sumOf { it.pageViews },
                     visitors = group.sumOf { it.visitors },
                 )
