@@ -182,7 +182,7 @@ Database migrations for properties, events, and app_users will execute automatic
 ----------------
 
 #+BEGIN_EXPORT html
-<img src="https://jointhefreeworld.org/static-assets/symbanta/symbanta-small.png" width="340" alt="Symbanta Logo">
+<img src="https://jointhefreeworld.org/static-assets/symbanta/symbanta-small.png" width="300" alt="Symbanta Logo">
 #+END_EXPORT
 
 ---------
