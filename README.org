@@ -1,4 +1,4 @@
-#+title: symbanta 🌿 Συμβάντα
+#+title: symbanta: Συμβάντα
 #+author: Josep Bigorra
 #+email: jjbigorra@gmail.com
 #+language: en
