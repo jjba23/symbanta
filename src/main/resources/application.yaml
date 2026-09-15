@@ -55,10 +55,10 @@ logging:
 
 application:
   user-seeder:
-    users:
-      - username: admin
-        password: password123
-        role: ROLE_ADMIN
+    users: []
+      # - username: admin
+      #   password: password123
+      #   role: ROLE_ADMIN
   property-seeder:
     properties:
       - domain: wikimusic.jointhefreeworld.org
