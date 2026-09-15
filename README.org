@@ -143,7 +143,7 @@ application:
 
 ------------
 
-[[https://jointhefreeworld.org/static-assets/symbanta/screen-2026-09-11-15-09-55.png]]
+[[https://jointhefreeworld.org/static-assets/symbanta/symbanta.gif]]
 
 --------
 
