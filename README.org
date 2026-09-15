@@ -181,7 +181,9 @@ Database migrations for properties, events, and app_users will execute automatic
 
 ----------------
 
-[[https://jointhefreeworld.org/static-assets/symbanta/symbanta-small.png]]
+#+BEGIN_EXPORT html
+<img src="https://jointhefreeworld.org/static-assets/symbanta/symbanta-small.png" width="380" alt="Symbanta Logo">
+#+END_EXPORT
 
 ---------
 
