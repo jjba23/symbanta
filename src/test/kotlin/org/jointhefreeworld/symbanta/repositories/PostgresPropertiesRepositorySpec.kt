@@ -5,6 +5,7 @@ import io.kotest.datatest.withTests
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
+import org.flywaydb.core.Flyway
 import org.jointhefreeworld.symbanta.domain.Property
 import org.jointhefreeworld.symbanta.domain.PropertyId
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
@@ -42,20 +43,15 @@ class PostgresPropertiesRepositorySpec :
 
         // Lifecycle Hooks
         beforeSpec {
-            jdbcTemplate.jdbcTemplate.execute(
-                """
-                CREATE TABLE IF NOT EXISTS properties (
-                    id UUID PRIMARY KEY,
-                    domain VARCHAR(255) NOT NULL,
-                    created_at TIMESTAMPTZ NOT NULL,
-                    updated_at TIMESTAMPTZ
-                );
-                """.trimIndent(),
-            )
+            Flyway
+                .configure()
+                .dataSource(dataSource)
+                .load()
+                .migrate()
         }
 
         beforeTest {
-            jdbcTemplate.jdbcTemplate.execute("TRUNCATE TABLE properties;")
+            jdbcTemplate.jdbcTemplate.execute("TRUNCATE TABLE events, properties;")
         }
 
         afterSpec {

@@ -357,7 +357,7 @@ class PostgresAnalyticsRepository(
                 COALESCE(ae.visitors, 0)::bigint AS visitors
             FROM time_buckets tb
             LEFT JOIN aggregated_events ae ON tb.bucket = ae.bucket
-            ORDER BY tb.bucket ASC;
+            ORDER BY tb.bucket;
             """.trimIndent()
 
         val getScreenSizeStatsSql =
