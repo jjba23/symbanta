@@ -2,9 +2,9 @@ package org.jointhefreeworld.symbanta.controllers
 
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpSession
-import org.jointhefreeworld.symbanta.openapi.controllers.ApiAuthLoginController
-import org.jointhefreeworld.symbanta.openapi.controllers.ApiAuthLogoutController
-import org.jointhefreeworld.symbanta.openapi.controllers.ApiAuthMeController
+import org.jointhefreeworld.symbanta.openapi.controllers.AuthLoginController
+import org.jointhefreeworld.symbanta.openapi.controllers.AuthLogoutController
+import org.jointhefreeworld.symbanta.openapi.controllers.AuthMeController
 import org.jointhefreeworld.symbanta.openapi.models.AuthResponseDto
 import org.jointhefreeworld.symbanta.openapi.models.LoginRequestDto
 import org.springframework.http.HttpStatus
@@ -20,9 +20,9 @@ import org.springframework.web.bind.annotation.*
 class UserControllerImpl(
     private val authenticationManager: AuthenticationManager,
     private val httpRequest: HttpServletRequest,
-) : ApiAuthLoginController,
-    ApiAuthLogoutController,
-    ApiAuthMeController {
+) : AuthLoginController,
+    AuthLogoutController,
+    AuthMeController {
     @PostMapping("/login")
     override fun login(
         @RequestBody loginRequest: LoginRequestDto,
