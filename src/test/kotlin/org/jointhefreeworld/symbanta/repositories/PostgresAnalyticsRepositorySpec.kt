@@ -326,4 +326,60 @@ class PostgresAnalyticsRepositorySpec :
                 stats.shouldBeEmpty()
             }
         }
+
+        context("getRouteStats") {
+            test("aggregates routes ordered by pageViews desc") {
+                val property = createAndSaveProperty("routes.com")
+                val from = baseTime.minusSeconds(100)
+                val to = baseTime.plusSeconds(100)
+
+                val someEvent =
+                    AnalyticsEvent(
+                        id = EventId(UUID.randomUUID()),
+                        propertyId = property.id,
+                        sessionId = SessionId("s1"),
+                        eventName = "page-view",
+                        url = "https://routes.com/",
+                        referrer = null,
+                        screenWidth = null,
+                        screenHeight = null,
+                        language = null,
+                        userAgent = null,
+                        propsJson = null,
+                        createdAt = baseTime,
+                    )
+
+                repository.saveEvent(someEvent)
+                repository.saveEvent(
+                    someEvent.copy(id = EventId(UUID.randomUUID()), createdAt = baseTime.plusSeconds(30)),
+                )
+
+                repository.saveEvent(
+                    someEvent.copy(
+                        id = EventId(UUID.randomUUID()),
+                        url = "https://routes.com/blog",
+                        sessionId = SessionId("s2"),
+                        createdAt = baseTime.plusSeconds(10),
+                    ),
+                )
+
+                val stats = repository.getRouteStats("routes.com", from, to)
+
+                stats shouldHaveSize 2
+                stats.first().route shouldBe "/"
+                stats.first().pageViews shouldBe 2L
+                stats.drop(1).first().route shouldBe "/blog"
+                stats.drop(1).first().pageViews shouldBe 1L
+            }
+
+            test("returns empty list when domain has no stats") {
+                val stats =
+                    repository.getUserAgentStats(
+                        "empty.com",
+                        baseTime.minusSeconds(100),
+                        baseTime.plusSeconds(100),
+                    )
+                stats.shouldBeEmpty()
+            }
+        }
     })
