@@ -20,6 +20,8 @@ package org.jointhefreeworld.symbanta.controllers
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.datatest.withData
+import org.jointhefreeworld.symbanta.TestPrelude.amsterdamStartOfDayInstant
+import org.jointhefreeworld.symbanta.TestPrelude.fixedClock
 import org.jointhefreeworld.symbanta.domain.AnalyticsRepository
 import org.jointhefreeworld.symbanta.domain.RouteStat
 import org.jointhefreeworld.symbanta.openapi.models.PeriodDto
@@ -28,29 +30,17 @@ import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 
 class V1StatsRoutesControllerImplSpec :
     FunSpec({
 
-        val stubRepository = mock<AnalyticsRepository>()
-        val amsterdamZone = ZoneId.of("Europe/Amsterdam")
-        val fixedClock = Clock.fixed(Instant.parse("2026-01-15T00:00:00Z"), amsterdamZone)
+        val repo = mock<AnalyticsRepository>()
 
         val mockMvc =
             MockMvcBuilders
-                .standaloneSetup(V1StatsRoutesControllerImpl(stubRepository, fixedClock))
+                .standaloneSetup(V1StatsRoutesControllerImpl(repo, fixedClock))
                 .setControllerAdvice(GlobalExceptionControllerAdvice::class.java)
                 .build()
-
-        fun amsterdamStartOfDayInstant(
-            year: Int,
-            month: Int,
-            day: Int,
-        ): Instant = LocalDate.of(year, month, day).atStartOfDay(amsterdamZone).toInstant()
 
         fun performGetRoutes(
             domain: String? = "example.com",
@@ -67,13 +57,13 @@ class V1StatsRoutesControllerImplSpec :
             }
 
         beforeTest {
-            reset(stubRepository)
+            reset(repo)
         }
 
         context("GET /v1/stats/routes - Happy Path") {
 
             test("returns 200 OK with formatted route statistics") {
-                whenever(stubRepository.getRouteStats(any(), any(), any())).thenReturn(
+                whenever(repo.getRouteStats(any(), any(), any())).thenReturn(
                     listOf(
                         RouteStat(route = "/home", pageViews = 150L, visitors = 100L),
                         RouteStat(route = "/about", pageViews = 50L, visitors = 30L),
@@ -93,7 +83,7 @@ class V1StatsRoutesControllerImplSpec :
                     jsonPath("$.items[1].visitors") { value(30) }
                 }
 
-                verify(stubRepository).getRouteStats(
+                verify(repo).getRouteStats(
                     eq("example.com"),
                     eq(amsterdamStartOfDayInstant(2026, 1, 1)),
                     eq(amsterdamStartOfDayInstant(2026, 1, 11)),
@@ -101,7 +91,7 @@ class V1StatsRoutesControllerImplSpec :
             }
 
             test("returns 200 OK with empty items list when repository returns no data") {
-                whenever(stubRepository.getRouteStats(any(), any(), any())).thenReturn(emptyList())
+                whenever(repo.getRouteStats(any(), any(), any())).thenReturn(emptyList())
 
                 performGetRoutes(endDate = "2026-01-05").andExpect {
                     status { isOk() }
@@ -110,7 +100,7 @@ class V1StatsRoutesControllerImplSpec :
             }
 
             test("returns 200 OK with empty items list for pre-defined period") {
-                whenever(stubRepository.getRouteStats(any(), any(), any())).thenReturn(emptyList())
+                whenever(repo.getRouteStats(any(), any(), any())).thenReturn(emptyList())
 
                 performGetRoutes(
                     period = PeriodDto.LAST_24_HOURS.value,
@@ -143,7 +133,7 @@ class V1StatsRoutesControllerImplSpec :
             }
 
             test("returns 500 Internal Server Error when repository throws an exception") {
-                whenever(stubRepository.getRouteStats(any(), any(), any()))
+                whenever(repo.getRouteStats(any(), any(), any()))
                     .thenThrow(RuntimeException("Database connection failed"))
 
                 performGetRoutes().andExpect {
