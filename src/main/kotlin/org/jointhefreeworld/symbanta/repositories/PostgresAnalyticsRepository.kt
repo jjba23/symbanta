@@ -220,7 +220,7 @@ class PostgresAnalyticsRepository(
     private val userAgentStatRowMapper =
         RowMapper { rs: ResultSet, _ ->
             UserAgentStat(
-                userAgent = rs.getString("user_agent") ?: "Unknown",
+                userAgent = rs.getString("user_agent") ?: "???",
                 pageViews = rs.getLong("page_views"),
                 visitors = rs.getLong("visitors"),
             )
@@ -246,6 +246,37 @@ class PostgresAnalyticsRepository(
                     .addValue("to", Timestamp.from(to))
 
             namedParameterJdbcTemplate.query(getUserAgentStatsSql, params, userAgentStatRowMapper)
+        }
+
+    private val routeStatRowMapper =
+        RowMapper { rs: ResultSet, _ ->
+            RouteStat(
+                route = rs.getString("route") ?: "???",
+                pageViews = rs.getLong("page_views"),
+                visitors = rs.getLong("visitors"),
+            )
+        }
+
+    @Transactional(readOnly = true)
+    override fun getRouteStats(
+        domain: String,
+        from: Instant,
+        to: Instant,
+    ): List<RouteStat> =
+        withLoggingContext(
+            "domain" to domain,
+            "from" to from.toString(),
+            "to" to to.toString(),
+        ) {
+            logger.info { "Fetching top routes breakdown from database" }
+
+            val params =
+                MapSqlParameterSource()
+                    .addValue("domain", domain)
+                    .addValue("from", Timestamp.from(from))
+                    .addValue("to", Timestamp.from(to))
+
+            namedParameterJdbcTemplate.query(getRouteStatsSql, params, routeStatRowMapper)
         }
 
     private companion object {
@@ -385,13 +416,29 @@ class PostgresAnalyticsRepository(
                 SELECT id FROM properties WHERE domain = :domain
             )
             SELECT
-                COALESCE(e.user_agent, 'Unknown') AS user_agent,
+                COALESCE(e.user_agent, '???') AS user_agent,
                 COUNT(*) FILTER (WHERE e.event_name = 'page-view') AS page_views,
                 COUNT(DISTINCT e.session_id) AS visitors
             FROM events e
             JOIN target_property tp ON e.property_id = tp.id
             WHERE e.created_at >= :from AND e.created_at <= :to
             GROUP BY e.user_agent
+            ORDER BY page_views DESC;
+            """.trimIndent()
+
+        val getRouteStatsSql =
+            """
+            WITH target_property AS (
+                SELECT id FROM properties WHERE domain = :domain
+            )
+            SELECT
+                REGEXP_REPLACE(e.url, '^https?://' || :domain, '') AS route,
+                COUNT(*) FILTER (WHERE e.event_name = 'page-view') AS page_views,
+                COUNT(DISTINCT e.session_id) AS visitors
+            FROM events e
+            JOIN target_property tp ON e.property_id = tp.id
+            WHERE e.created_at >= :from AND e.created_at <= :to
+            GROUP BY 1
             ORDER BY page_views DESC;
             """.trimIndent()
     }

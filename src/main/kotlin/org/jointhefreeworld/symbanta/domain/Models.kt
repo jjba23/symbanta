@@ -98,3 +98,9 @@ data class TimeSeriesPoint(
     val pageViews: Long,
     val visitors: Long,
 )
+
+data class RouteStat(
+    val route: String,
+    val pageViews: Long,
+    val visitors: Long,
+)

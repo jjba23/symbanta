@@ -49,4 +49,10 @@ interface AnalyticsRepository {
         from: Instant,
         to: Instant,
     ): List<ScreenSizeStat>
+
+    fun getRouteStats(
+        domain: String,
+        from: Instant,
+        to: Instant,
+    ): List<RouteStat>
 }

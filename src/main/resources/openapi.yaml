@@ -100,6 +100,53 @@ paths:
               schema:
                 $ref: "#/components/schemas/V1ProblemDetails"
 
+  /v1/stats/routes:
+    get:
+      summary: Get route visit statistics
+      description: Retrieve aggregated metrics (page views, unique visitors) grouped by route for a given domain.
+      operationId: getRouteStats
+      parameters:
+        - name: domain
+          in: query
+          required: true
+          schema:
+            type: string
+            example: example.com
+          description: Registered domain name to fetch metrics for.
+        - name: period
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/Period"
+          description: Time range for metrics aggregation.
+        - name: start-date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Required if period is set to `CUSTOM` (YYYY-MM-DD).
+        - name: end-date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Required if period is set to `CUSTOM` (YYYY-MM-DD).
+      responses:
+        "200":
+          description: Route statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1RouteStatsResponse"
+        "401":
+          description: Unauthorized dashboard access
+          content:
+            application/problem+detail:
+              schema:
+                $ref: "#/components/schemas/V1ProblemDetails"
+
   /v1/stats/screen-sizes:
     get:
       summary: Get screen size breakdown statistics
@@ -297,7 +344,7 @@ paths:
   /v1/stats/timeseries:
     get:
       summary: Get time-series statistics for chart rendering
-      description: Retrieve time-bucketed analytics (hourly or daily) formatted for populating bar/line charts.
+      description: Retrieve time-bucketed analytics formatted for bar/line charts.
       operationId: getTimeSeriesStats
       parameters:
         - name: domain
@@ -616,6 +663,48 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/V1ScreenSizeStat"
+
+    V1RouteStat:
+      type: object
+      required:
+        - route
+        - pageViews
+        - visitors
+      properties:
+        route:
+          type: string
+          example: "/blog"
+          description: Route.
+        pageViews:
+          type: integer
+          example: 1450
+          description: Total page views associated with this route.
+        visitors:
+          type: integer
+          example: 320
+          description: Distinct session visitors using this route.
+
+    V1RouteStatsResponse:
+      type: object
+      required:
+        - from
+        - to
+        - items
+      properties:
+        from:
+          type: string
+          format: date-time
+          example: "2026-08-08T08:49:28Z"
+          description: Start timestamp for the aggregated metrics period (inclusive).
+        to:
+          type: string
+          format: date-time
+          example: "2026-09-07T08:49:28Z"
+          description: End timestamp for the aggregated metrics period (inclusive).
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/V1RouteStat"
 
     V1UserAgentStat:
       type: object
