@@ -19,27 +19,52 @@
 package org.jointhefreeworld.symbanta.controllers
 
 import io.kotest.core.spec.style.FunSpec
+import io.kotest.datatest.withData
 import org.jointhefreeworld.symbanta.domain.AnalyticsRepository
 import org.jointhefreeworld.symbanta.domain.RouteStat
 import org.jointhefreeworld.symbanta.openapi.models.PeriodDto
 import org.mockito.kotlin.*
 import org.springframework.http.MediaType
+import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
-import java.time.*
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 class V1StatsRoutesControllerImplSpec :
     FunSpec({
 
         val stubRepository = mock<AnalyticsRepository>()
-        val fixedClock = Clock.fixed(Instant.parse("2026-01-15T00:00:00Z"), ZoneOffset.UTC)
-        val controller = V1StatsRoutesControllerImpl(stubRepository, fixedClock)
+        val amsterdamZone = ZoneId.of("Europe/Amsterdam")
+        val fixedClock = Clock.fixed(Instant.parse("2026-01-15T00:00:00Z"), amsterdamZone)
 
         val mockMvc =
             MockMvcBuilders
-                .standaloneSetup(controller)
+                .standaloneSetup(V1StatsRoutesControllerImpl(stubRepository, fixedClock))
                 .setControllerAdvice(GlobalExceptionControllerAdvice::class.java)
                 .build()
+
+        fun amsterdamStartOfDayInstant(
+            year: Int,
+            month: Int,
+            day: Int,
+        ): Instant = LocalDate.of(year, month, day).atStartOfDay(amsterdamZone).toInstant()
+
+        fun performGetRoutes(
+            domain: String? = "example.com",
+            period: String? = PeriodDto.CUSTOM.value,
+            startDate: String? = "2026-01-01",
+            endDate: String? = "2026-01-10",
+        ): ResultActionsDsl =
+            mockMvc.get("/v1/stats/routes") {
+                domain?.let { param("domain", it) }
+                period?.let { param("period", it) }
+                startDate?.let { param("start-date", it) }
+                endDate?.let { param("end-date", it) }
+                accept = MediaType.APPLICATION_JSON
+            }
 
         beforeTest {
             reset(stubRepository)
@@ -55,97 +80,75 @@ class V1StatsRoutesControllerImplSpec :
                     ),
                 )
 
-                mockMvc
-                    .get("/v1/stats/routes") {
-                        param("domain", "example.com")
-                        param("period", PeriodDto.CUSTOM.value)
-                        param("start-date", "2026-01-01")
-                        param("end-date", "2026-01-10")
-                        accept = MediaType.APPLICATION_JSON
-                    }.andExpect {
-                        status { isOk() }
-                        content { contentType(MediaType.APPLICATION_JSON) }
-                        jsonPath("$.from") { value("2025-12-31T23:00:00Z") }
-                        jsonPath("$.to") { value("2026-01-10T23:00:00Z") }
-                        jsonPath("$.items[0].route") { value("/home") }
-                        jsonPath("$.items[0].pageViews") { value(150) }
-                        jsonPath("$.items[0].visitors") { value(100) }
-                        jsonPath("$.items[1].route") { value("/about") }
-                        jsonPath("$.items[1].pageViews") { value(50) }
-                        jsonPath("$.items[1].visitors") { value(30) }
-                    }
+                performGetRoutes().andExpect {
+                    status { isOk() }
+                    content { contentType(MediaType.APPLICATION_JSON) }
+                    jsonPath("$.from") { value("2025-12-31T23:00:00Z") }
+                    jsonPath("$.to") { value("2026-01-10T23:00:00Z") }
+                    jsonPath("$.items[0].route") { value("/home") }
+                    jsonPath("$.items[0].pageViews") { value(150) }
+                    jsonPath("$.items[0].visitors") { value(100) }
+                    jsonPath("$.items[1].route") { value("/about") }
+                    jsonPath("$.items[1].pageViews") { value(50) }
+                    jsonPath("$.items[1].visitors") { value(30) }
+                }
 
-                verify(stubRepository, times(1)).getRouteStats(
+                verify(stubRepository).getRouteStats(
                     eq("example.com"),
-                    eq(LocalDate.of(2026, 1, 1).atStartOfDay(ZoneId.of("Europe/Amsterdam")).toInstant()),
-                    eq(LocalDate.of(2026, 1, 11).atStartOfDay(ZoneId.of("Europe/Amsterdam")).toInstant()),
+                    eq(amsterdamStartOfDayInstant(2026, 1, 1)),
+                    eq(amsterdamStartOfDayInstant(2026, 1, 11)),
                 )
             }
 
             test("returns 200 OK with empty items list when repository returns no data") {
                 whenever(stubRepository.getRouteStats(any(), any(), any())).thenReturn(emptyList())
 
-                mockMvc
-                    .get("/v1/stats/routes") {
-                        param("domain", "example.com")
-                        param("period", PeriodDto.CUSTOM.value)
-                        param("start-date", "2026-01-01")
-                        param("end-date", "2026-01-05")
-                    }.andExpect {
-                        status { isOk() }
-                        jsonPath("$.items") { isEmpty() }
-                    }
+                performGetRoutes(endDate = "2026-01-05").andExpect {
+                    status { isOk() }
+                    jsonPath("$.items") { isEmpty() }
+                }
             }
-            test("returns 200 OK with empty items list for pre-defined period when repository returns no data") {
+
+            test("returns 200 OK with empty items list for pre-defined period") {
                 whenever(stubRepository.getRouteStats(any(), any(), any())).thenReturn(emptyList())
 
-                mockMvc
-                    .get("/v1/stats/routes") {
-                        param("domain", "example.com")
-                        param("period", PeriodDto.LAST_24_HOURS.value)
-                    }.andExpect {
-                        status { isOk() }
-                        jsonPath("$.items") { isEmpty() }
-                    }
+                performGetRoutes(
+                    period = PeriodDto.LAST_24_HOURS.value,
+                    startDate = null,
+                    endDate = null,
+                ).andExpect {
+                    status { isOk() }
+                    jsonPath("$.items") { isEmpty() }
+                }
             }
         }
 
         context("GET /v1/stats/routes - Unhappy Path") {
 
-            test("returns 400 Bad Request when required 'domain' query parameter is missing") {
-                mockMvc
-                    .get("/v1/stats/routes") {
-                        param("period", PeriodDto.CUSTOM.value)
-                        param("start-date", "2026-01-01")
-                        param("end-date", "2026-01-10")
-                    }.andExpect {
+            context("validation errors return 400 Bad Request") {
+                data class TestCase(
+                    val name: String,
+                    val domain: String?,
+                    val period: String?,
+                )
+
+                withData(
+                    TestCase("missing required domain parameter", domain = null, period = PeriodDto.CUSTOM.value),
+                    TestCase("invalid period parameter value", domain = "example.com", period = "INVALID_PERIOD"),
+                ) { testCase ->
+                    performGetRoutes(domain = testCase.domain, period = testCase.period).andExpect {
                         status { isBadRequest() }
                     }
+                }
             }
 
-            test("returns 400 Bad Request when 'period' parameter value is invalid") {
-                mockMvc
-                    .get("/v1/stats/routes") {
-                        param("domain", "example.com")
-                        param("period", "INVALID_PERIOD")
-                    }.andExpect {
-                        status { isBadRequest() }
-                    }
-            }
-
-            test("returns 500 Internal Server Error when repository throws an unhandled exception") {
+            test("returns 500 Internal Server Error when repository throws an exception") {
                 whenever(stubRepository.getRouteStats(any(), any(), any()))
                     .thenThrow(RuntimeException("Database connection failed"))
 
-                mockMvc
-                    .get("/v1/stats/routes") {
-                        param("domain", "example.com")
-                        param("period", PeriodDto.CUSTOM.value)
-                        param("start-date", "2026-01-01")
-                        param("end-date", "2026-01-10")
-                    }.andExpect {
-                        status { isInternalServerError() }
-                    }
+                performGetRoutes().andExpect {
+                    status { isInternalServerError() }
+                }
             }
         }
     })
