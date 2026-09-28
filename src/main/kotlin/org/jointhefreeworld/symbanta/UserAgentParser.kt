@@ -89,16 +89,75 @@ object UserAgentParser {
         // Detect Browser (Order matters: check niche browsers before Safari/Chrome)
         val browser =
             when {
-                ua.contains("SamsungBrowser/") -> "Samsung Internet"
-                ua.contains("OPR/") || ua.contains("Opera/") -> "Opera"
-                ua.contains("Vivaldi/") -> "Vivaldi"
-                ua.contains("YaBrowser/") -> "Yandex Browser"
-                ua.contains("UCBrowser/") -> "UC Browser"
+                // Niche, FOSS, and Privacy-focused Gecko forks
+                ua.contains("LibreWolf/") -> "LibreWolf"
+
+                ua.contains("Waterfox/") -> "Waterfox"
+
+                ua.contains("PaleMoon/") -> "Pale Moon"
+
+                ua.contains("Iceweasel/") -> "Iceweasel"
+
+                ua.contains("MullvadBrowser/") -> "Mullvad Browser"
+
+                ua.contains("TorBrowser/") || (ua.contains("Firefox/") && ua.contains("Android") && ua.contains("Orbot")) -> "Tor Browser"
+
+                ua.contains("Fennec/") -> "Fennec"
+
+                // Niche & FOSS WebKitGTK / Qt / GNU/Linux-native Browsers
+                ua.contains("Epiphany/") -> "GNOME Web (Epiphany)"
+
+                ua.contains("Falkon/") -> "Falkon"
+
+                ua.contains("Luakit/") -> "Luakit"
+
+                ua.contains("Qutebrowser") -> "qutebrowser"
+
+                ua.contains("Midori/") -> "Midori"
+
+                ua.contains("Min/") -> "Min"
+
+                ua.contains("Nyxt/") -> "Nyxt"
+
+                // Niche Chromium forks & Keyboard/Productivity Browsers
+                ua.contains("Arc/") -> "Arc"
+
+                ua.contains("Orion/") -> "Orion"
+
                 ua.contains("Brave") -> "Brave"
+
+                ua.contains("Vivaldi/") -> "Vivaldi"
+
+                ua.contains("Chromium/") -> "Chromium"
+
+                ua.contains("Ungoogled") || ua.contains("Ungoogled-Chromium") -> "Ungoogled Chromium"
+
+                // Mobile & Other Region/Vendor Niche Browsers
+                ua.contains("SamsungBrowser/") -> "Samsung Internet"
+
+                ua.contains("OPR/") || ua.contains("Opera/") || ua.contains("OPT/") -> "Opera"
+
+                ua.contains("YaBrowser/") -> "Yandex Browser"
+
+                ua.contains("UCBrowser/") -> "UC Browser"
+
+                ua.contains("DuckDuckGo/") -> "DuckDuckGo"
+
+                ua.contains("Focus/") -> "Firefox Focus"
+
+                // Major Browsers
+                ua.contains("SamsungBrowser/") -> "Samsung Internet"
+
+                ua.contains("Brave") -> "Brave"
+
                 ua.contains("Edg/") || ua.contains("Edge/") -> "Edge"
+
                 ua.contains("Firefox/") || ua.contains("FxiOS/") -> "Firefox"
+
                 ua.contains("Chrome/") || ua.contains("CriOS/") -> "Chrome"
+
                 ua.contains("Safari/") || ua.contains("Version/") || ua.contains("Mobile/") -> "Safari"
+
                 else -> null
             }
 

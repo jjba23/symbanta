@@ -21,19 +21,23 @@
 
 ;; ====== Configuration ======
 
-(define http-port 8080)
+(define http-port
+  8080)
 
 ;; ====== Helpers ======
 
 (define (mvn goal)
   "Run a Maven GOAL inside the Nix development environment."
-  ($ (list
-      "nix --extra-experimental-features 'nix-command flakes' develop -c"
+  ($ (list "nix --extra-experimental-features 'nix-command flakes' develop -c"
       (~ "bash -c './mvnw ~a'" goal))))
 
 (define (run-server)
   "Run the Spring Boot development server."
   (mvn "spring-boot:run"))
+
+(define (test)
+  "Test the project."
+  (mvn "test"))
 
 ;; ====== Maak tasks ======
 
