@@ -66,3 +66,4 @@ application:
       # - domain: localhost
       - domain: byggsteg.jointhefreeworld.org
       - domain: lucidplan.jointhefreeworld.org
+      - domain: carvoeirowaterfun.com
