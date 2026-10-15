@@ -583,7 +583,7 @@ components:
       properties:
         granularity:
           type: string
-          enum: [ HOUR, DAY ]
+          enum: [HOUR, DAY]
           example: "DAY"
           description: Time bucket size used for aggregation.
         from:
