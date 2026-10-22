@@ -14,5 +14,14 @@ import javax.sql.DataSource
 )
 class FlywayConfig {
     @Bean(initMethod = "migrate")
-    fun flyway(dataSource: DataSource): Flyway = Flyway.configure().dataSource(dataSource).load()
+    fun flyway(dataSource: DataSource): Flyway =
+        Flyway
+            .configure()
+            .dataSource(dataSource)
+            // Databases created before V2__add_localhost_property.sql was removed still record it
+            // as applied. Without this, validation aborts startup on every such database and the
+            // application can never boot again. Only migrations that are absent locally are
+            // ignored; checksums of the migrations that do exist are still validated.
+            .ignoreMigrationPatterns("*:missing")
+            .load()
 }
