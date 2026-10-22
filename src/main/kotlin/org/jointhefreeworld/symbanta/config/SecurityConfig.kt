@@ -90,6 +90,9 @@ class SecurityConfig {
         source.registerCorsConfiguration("/auth/**", apiCorsConfig)
         source.registerCorsConfiguration("/v1/stats/**", apiCorsConfig)
         source.registerCorsConfiguration("/v1/properties", apiCorsConfig)
+        // Consumed by the same dashboard, so they need the same browser origins.
+        source.registerCorsConfiguration("/v1/logs", apiCorsConfig)
+        source.registerCorsConfiguration("/v1/event-types", apiCorsConfig)
 
         return source
     }
