@@ -67,7 +67,7 @@ check: lint test
 # Benchmarks (issue #3)
 # ------------------------------------------------------------------------------
 
-# Run the JVM micro-benchmarks and ingestion pipeline benchmark (no database needed)
+# Run the JVM micro-benchmarks: domain services, ingestion request path and batched writer (no database needed)
 bench:
     ./mvnw -q -DskipTests compile exec:java -Dexec.mainClass=org.jointhefreeworld.symbanta.benchmark.BenchmarksKt -Dexec.classpathScope=runtime
 

@@ -35,6 +35,8 @@ data class UserSeederConfigItem(
 data class IngestionConfig(
     val queueCapacity: Int = 10_000,
     val workerCount: Int = 8,
+    /** Upper bound on how many queued events one worker writes in a single batch. */
+    val maxBatchSize: Int = 500,
 )
 
 @ConfigurationProperties(prefix = "application.property-seeder")

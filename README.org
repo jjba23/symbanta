@@ -20,25 +20,31 @@ Instead of profiling individuals or building invasive cross-site identities, Sym
 Symbanta is organised as a hexagonal (ports and adapters) application. Dependencies point inwards: the domain and the application layer never import Spring, JDBC, HTTP or the generated OpenAPI classes.
 
 #+begin_src text
-  inbound adapters              inbound ports            use cases                  outbound ports             outbound adapters
-  HTTP controllers (Spring)  →  IngestEventUseCase    →  EventIngestionService   →  EventStorePort          →  PostgreSQL
-  Spring Security            →  Get*StatsUseCase      →  StatisticsQueryService  →  AnalyticsQueryPort      →  PostgreSQL
-  YAML seeders               →  ManageEventTypes...   →  EventTypeService        →  EventTypeRepositoryPort →  PostgreSQL
-  (CLI / tests)              →  GetConsoleLogsUseCase →  ConsoleLogService       →  GeoLocationPort         →  CDN headers
-                                                                                   →  ClockPort               →  system clock
-                                                                                   →  EventDispatchPort      →  coroutines
+  feature/<name>/domain                        plain Kotlin entities and domain services
+  feature/<name>/port/inbound                  use cases the application offers
+  feature/<name>/port/outbound                 capabilities the application needs
+  feature/<name>/service                       use case implementations
+  feature/<name>/adapter/inbound/...           HTTP controllers, security SPI, seeders
+  feature/<name>/adapter/outbound/...          PostgreSQL stores, CDN headers, queue workers
+  shared/{domain,port,adapter}                 identifiers, reporting periods, errors, clock
+  config/                                      composition root
 #+end_src
 
-- Domain (~domain/model~, ~domain/service~): entities, value objects, statistics, reporting period maths, user agent and screen size aggregation. Plain Kotlin, testable with a fixed clock.
-- Application (~application/port~, ~application/service~): inbound ports state /what the application does/ (ingest an event, query statistics, register an event type); outbound ports state /what it needs/ (stores, clock, geolocation, work dispatch).
-- Adapters (~adapter/inbound/*~, ~adapter/outbound/*~): Spring MVC controllers implementing the generated OpenAPI contracts, Spring Security's user details SPI, YAML seeders, PostgreSQL repositories, the coroutine dispatcher, the header based geolocation resolver and the system clock.
-- Composition root: ~config/WiringConfig~ is the only place where ports are bound to implementations. Replacing PostgreSQL or the in-process dispatcher is a change confined to that file.
+Everything is grouped by feature, and inside a feature by the hexagonal role:
+
+- ~events~: ingestion (validate and enqueue), the durable writer, the bounded queue, geolocation.
+- ~statistics~: summary, time series, routes, screen sizes, user agents, events and countries; the read-side query port and its PostgreSQL adapter.
+- ~properties~, ~eventtypes~, ~auth~, ~console~, ~telemetry~: one feature per domain concern, each with its own ports, services and adapters.
+- ~shared~: the kernel every feature may depend on — =PropertyId=, =EventId=, =DateRange=, =TimePeriod=, the reporting period resolver, the exceptions and the clock port.
+- Composition root: ~config/WiringConfig~ is the only place where ports are bound to implementations. Replacing PostgreSQL, or the in-process queue for a broker, is a change confined to that file.
+
+Dependencies only ever point inwards: =domain= has no framework imports, =service= only knows its feature's ports, and adapters implement ports. A feature never reaches into another feature's adapter or service.
 
 The server backend is implemented using modern infrastructure designed for high throughput, strict domain isolation, and non-blocking asynchronous processing:
 
 - Telemetry Snippet: Integrating symbanta into your project is extremely lightweight and customizable ✨, even See [[file:src/main/resources/js/symbanta.js][vanilla self-contained JavaScript client]] (~10 KB, ≈2.5 KB gzipped) containing zero external dependencies.
 
-- Asynchronous Event Queue: Fire-and-forget ingestion over a bounded Kotlin Coroutines queue (a fixed worker pool on =Dispatchers.IO=). The API always answers =202 Accepted= immediately while database writes happen off the HTTP thread pool; when the burst exceeds the queue capacity the excess is dropped with a rate-limited warning instead of exhausting the JDBC pool or the heap.
+- Asynchronous Event Queue: Fire-and-forget ingestion over a bounded Kotlin Coroutines queue (a fixed worker pool on =Dispatchers.IO=). The API always answers =202 Accepted= immediately while database writes happen off the HTTP thread pool. Workers coalesce whatever is queued into one JDBC batch per write, so throughput is bound by batches rather than events. When the burst exceeds the queue capacity the excess is dropped with a rate-limited warning (and a counter) instead of exhausting the JDBC pool or the heap.
 
 - Storage Layer: PostgreSQL featuring native =jsonb= document support for extensible payload properties, managed strictly via Flyway schema migrations.
 
@@ -210,6 +216,47 @@ application:
 
 ------------
 
+* Observability
+
+Ingestion overload is visible from outside the JVM: the queue adapter publishes Micrometer meters that
+Actuator exposes in Prometheus format at =GET /actuator/prometheus=.
+
+| Meter                                      | Type      | Meaning                                              |
+|--------------------------------------------+-----------+------------------------------------------------------|
+| =symbanta_ingestion_queue_backlog=          | gauge     | Events accepted but not yet written (queue backlog)  |
+| =symbanta_ingestion_events_enqueued_total=  | counter   | Events accepted from HTTP                            |
+| =symbanta_ingestion_events_processed_total= | counter   | Events durably written                               |
+| =symbanta_ingestion_events_failed_total=    | counter   | Events lost because their batch could not be written |
+| =symbanta_ingestion_events_dropped_total=   | counter   | Events rejected because the queue was full           |
+| =symbanta_ingestion_batch_events=           | summary   | Events coalesced into one write (count, sum, max)     |
+| =symbanta_ingestion_batch_flush_seconds=    | timer     | Time spent persisting one batch                      |
+
+Alert on =increase(symbanta_ingestion_events_dropped_total[5m]) > 0= (traffic exceeds the write
+budget) and on a backlog that does not drain (=symbanta_ingestion_queue_backlog= growing while
+=processed= stalls).
+
+=GET /actuator/health= and =GET /actuator/prometheus= are reachable without a session so probes and
+scrapers work out of the box; the rest of =/actuator/**= requires =ROLE_ADMIN=. The metrics contain
+only aggregate counters and timings, but if the endpoint is exposed to the internet, restrict it at
+the reverse proxy (or move =/actuator/prometheus= behind =ROLE_ADMIN= in ~config/SecurityConfig~).
+Exposed endpoints and the ingestion knobs live in ~application.yaml~:
+
+#+begin_src yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,metrics
+
+application:
+  ingestion:
+    queue-capacity: 10000
+    worker-count: 8
+    max-batch-size: 500
+#+end_src
+
+------------
+
 [[https://jointhefreeworld.org/static-assets/symbanta/symbanta.gif]]
 
 --------
@@ -262,8 +309,9 @@ Performance work is measured, not guessed. Two complementary harnesses live in t
 
 1. *JVM benchmarks* (~just bench~): dependency-free harness that warms up, runs several rounds and
    reports the best result for the pure domain services (user agent parsing, screen size bucketing,
-   reporting period resolution) and for the whole ingestion use case wired to in-memory adapters.
-   No database or network is involved, so the numbers describe Symbanta's own code.
+   reporting period resolution), for the request path (validation + enqueue) and for a worker batch
+   write of 500 events wired to in-memory adapters. No database or network is involved, so the
+   numbers describe Symbanta's own code.
 2. *HTTP load tests*, two interchangeable drivers:
    - [[https://k6.io][k6]] (~just bench-http~, ~just bench-query~): constant-arrival-rate ingestion and
      dashboard read load, with thresholds. This is the canonical harness.
@@ -286,16 +334,38 @@ Treat these as a regression baseline, not as a capacity promise.
 | =UserAgentParser.parse= (desktop UA)               | 767 ns/op (1.3M ops/s)                                  |
 | =ScreenSizeMapper.mapToBucket=                     | 8.5 ns/op (118M ops/s)                                  |
 | =ReportingPeriodResolver.resolve= (CUSTOM window)  | 447 ns/op (2.2M ops/s)                                  |
-| Ingestion use case, in-memory adapters             | 917 ns/event (1.09M events/s)                           |
-| =POST /v1/events/register=, 8 connections          | 3.6k req/s, p50 1.9 ms, p95 3.8 ms, p99 5.2 ms, 0 errors |
+| Ingestion request path (validate + enqueue)        | 751 ns/event (1.33M events/s)                           |
+| Worker batch write, in-memory store (500/batch)    | 70 ns/event (14.3M events/s)                            |
+| =POST /v1/events/register=, 8 connections          | 3.2k req/s, p50 2.1 ms, p95 5.0 ms, p99 7.2 ms, 0 errors |
+| =POST /v1/events/register=, 32 connections         | 4.4k req/s, p50 6.5 ms, p95 14 ms, p99 19 ms, 0 errors   |
+| Durable writer, batched, 32 connections            | ~4.7-5k events/s, 0 dropped, backlog drains to 0         |
 | Dashboard queries, 8 connections, 7 endpoints      | 31 iterations/s, p95 419 ms                             |
 
-At ~3.6k accepted events/s the durable writer (~3k events/s on this machine) falls behind. The
-bounded ingestion queue (10,000 slots, 8 workers) then rejects the excess with a rate-limited
-warning while HTTP keeps answering =202= in a few milliseconds: no connection-pool collapse and no
+Ingestion used to write one row per event, which topped out around 3k events/s on this machine: at
+~3.6k accepted events/s the writer fell behind and the bounded queue started dropping. The worker now
+coalesces the queue into one multi-row =INSERT= per flush, so a burst of events costs a handful of
+round trips instead of one per event. Re-running the same load after the change shows the whole burst
+accepted and durably written with zero drops:
+
+- 8 connections, 10 s: 32,252 events accepted at 3.2k req/s, all 32,252 stored, =dropped= 0.
+- 32 connections, 10 s: 43,792 events accepted at 4.4k req/s, all stored, =dropped= 0, and
+  =symbanta_ingestion_queue_backlog= returned to 0 within a second of the load stopping.
+
+HTTP keeps answering =202= in a few milliseconds meanwhile: no connection-pool collapse and no
 unbounded memory growth. An earlier unbounded variant of this dispatcher did collapse under the same
-load (JDBC pool exhausted, requests timing out), which is why the queue is bounded and configurable
-through =application.ingestion.queue-capacity= / =application.ingestion.worker-count=.
+load (JDBC pool exhausted, requests timing out), which is why the queue stays bounded and
+configurable through =application.ingestion.queue-capacity= / =worker-count= / =max-batch-size=.
+
+** Testing outbound adapters
+
+The analytics outbound ports have reusable contract suites:
+
+- ~AnalyticsQueryPortContract~ (statistics) and ~EventStorePortContract~ (events) live next to their
+  ports under ~src/test/kotlin~ and take a small fixture that creates the adapter, seeds a property
+  and resets state.
+- The PostgreSQL specs extend them, so aggregation, ordering, window and batch semantics are
+  identical for every adapter and a future implementation cannot silently diverge. Its own spec only
+  supplies the fixture plus adapter-specific assertions (columns, SQL details).
 
 ----------------
 

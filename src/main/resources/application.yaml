@@ -36,6 +36,14 @@ spring:
     enabled: true
 
 management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
   otlp:
     metrics:
       export:
@@ -54,10 +62,12 @@ logging:
 
 
 application:
-  # Asynchronous ingestion queue (see CoroutineEventDispatcher)
+  # Asynchronous ingestion queue (see BatchingEventDispatcher)
   ingestion:
     queue-capacity: 10000
     worker-count: 8
+    # Events coalesced into one batched INSERT
+    max-batch-size: 500
   user-seeder:
     users: []
       # - username: admin

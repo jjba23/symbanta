@@ -27,6 +27,12 @@ class SecurityConfig {
                 auth
                     .requestMatchers("/auth/**", "/v1/events/register", "/symbanta.js", "/error")
                     .permitAll()
+                    // Probes and the Prometheus scrape endpoint stay reachable without a browser
+                    // session; every other actuator endpoint requires an administrator.
+                    .requestMatchers("/actuator/health/**", "/actuator/health", "/actuator/prometheus/**")
+                    .permitAll()
+                    .requestMatchers("/actuator/**")
+                    .hasAuthority("ROLE_ADMIN")
                     .requestMatchers("/admin/**")
                     .hasAuthority("ROLE_ADMIN")
                     .anyRequest()
