@@ -20,15 +20,17 @@ package org.jointhefreeworld.symbanta.config
 
 import io.micrometer.core.instrument.MeterRegistry
 import org.jointhefreeworld.symbanta.feature.auth.adapter.inbound.security.DatabaseUserDetailsService
-import org.jointhefreeworld.symbanta.feature.auth.adapter.outbound.persistence.PostgresUserAccountRepository
+import org.jointhefreeworld.symbanta.feature.auth.adapter.outbound.persistence.JpaUserAccountRepository
+import org.jointhefreeworld.symbanta.feature.auth.adapter.outbound.persistence.UserAccountJpaRepository
 import org.jointhefreeworld.symbanta.feature.auth.adapter.outbound.security.BCryptPasswordHasher
 import org.jointhefreeworld.symbanta.feature.auth.port.outbound.PasswordHasherPort
 import org.jointhefreeworld.symbanta.feature.auth.port.outbound.UserAccountRepositoryPort
-import org.jointhefreeworld.symbanta.feature.console.adapter.outbound.persistence.PostgresConsoleLogAdapter
+import org.jointhefreeworld.symbanta.feature.console.adapter.outbound.persistence.JpaConsoleLogAdapter
 import org.jointhefreeworld.symbanta.feature.console.port.outbound.ConsoleLogQueryPort
 import org.jointhefreeworld.symbanta.feature.console.service.ConsoleLogService
 import org.jointhefreeworld.symbanta.feature.events.adapter.outbound.geo.HttpHeaderGeoLocationAdapter
-import org.jointhefreeworld.symbanta.feature.events.adapter.outbound.persistence.PostgresEventStore
+import org.jointhefreeworld.symbanta.feature.events.adapter.outbound.persistence.EventJpaRepository
+import org.jointhefreeworld.symbanta.feature.events.adapter.outbound.persistence.JpaEventStore
 import org.jointhefreeworld.symbanta.feature.events.adapter.outbound.queue.BatchingEventDispatcher
 import org.jointhefreeworld.symbanta.feature.events.port.inbound.EventPersistenceUseCase
 import org.jointhefreeworld.symbanta.feature.events.port.outbound.EventQueuePort
@@ -36,20 +38,21 @@ import org.jointhefreeworld.symbanta.feature.events.port.outbound.EventStorePort
 import org.jointhefreeworld.symbanta.feature.events.port.outbound.GeoLocationPort
 import org.jointhefreeworld.symbanta.feature.events.service.EventIngestionService
 import org.jointhefreeworld.symbanta.feature.events.service.EventPersistenceService
-import org.jointhefreeworld.symbanta.feature.eventtypes.adapter.outbound.persistence.PostgresEventTypeRepository
+import org.jointhefreeworld.symbanta.feature.eventtypes.adapter.outbound.persistence.EventTypeJpaRepository
+import org.jointhefreeworld.symbanta.feature.eventtypes.adapter.outbound.persistence.JpaEventTypeRepository
 import org.jointhefreeworld.symbanta.feature.eventtypes.port.outbound.EventTypeRepositoryPort
 import org.jointhefreeworld.symbanta.feature.eventtypes.service.EventTypeService
-import org.jointhefreeworld.symbanta.feature.properties.adapter.outbound.persistence.PostgresPropertiesRepository
+import org.jointhefreeworld.symbanta.feature.properties.adapter.outbound.persistence.JpaPropertyRepository
+import org.jointhefreeworld.symbanta.feature.properties.adapter.outbound.persistence.PropertyJpaRepository
 import org.jointhefreeworld.symbanta.feature.properties.port.outbound.PropertyRepositoryPort
 import org.jointhefreeworld.symbanta.feature.properties.service.PropertyService
-import org.jointhefreeworld.symbanta.feature.statistics.adapter.outbound.persistence.PostgresAnalyticsQueryAdapter
+import org.jointhefreeworld.symbanta.feature.statistics.adapter.outbound.persistence.JpaAnalyticsQueryAdapter
 import org.jointhefreeworld.symbanta.feature.statistics.port.outbound.AnalyticsQueryPort
 import org.jointhefreeworld.symbanta.feature.statistics.service.StatisticsQueryService
 import org.jointhefreeworld.symbanta.shared.adapter.outbound.time.SystemClockAdapter
 import org.jointhefreeworld.symbanta.shared.port.outbound.ClockPort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.security.crypto.password.PasswordEncoder
 
@@ -74,22 +77,25 @@ class WiringConfig {
     fun passwordHasherPort(passwordEncoder: PasswordEncoder): PasswordHasherPort = BCryptPasswordHasher(passwordEncoder)
 
     @Bean
-    fun eventStorePort(jdbc: NamedParameterJdbcTemplate): EventStorePort = PostgresEventStore(jdbc)
+    fun eventStorePort(repository: EventJpaRepository): EventStorePort = JpaEventStore(repository)
 
     @Bean
-    fun analyticsQueryPort(jdbc: NamedParameterJdbcTemplate): AnalyticsQueryPort = PostgresAnalyticsQueryAdapter(jdbc)
+    fun analyticsQueryPort(
+        properties: PropertyRepositoryPort,
+        repository: EventJpaRepository,
+    ): AnalyticsQueryPort = JpaAnalyticsQueryAdapter(properties, repository)
 
     @Bean
-    fun consoleLogQueryPort(jdbc: NamedParameterJdbcTemplate): ConsoleLogQueryPort = PostgresConsoleLogAdapter(jdbc)
+    fun consoleLogQueryPort(repository: EventJpaRepository): ConsoleLogQueryPort = JpaConsoleLogAdapter(repository)
 
     @Bean
-    fun propertyRepositoryPort(jdbc: NamedParameterJdbcTemplate): PropertyRepositoryPort = PostgresPropertiesRepository(jdbc)
+    fun propertyRepositoryPort(repository: PropertyJpaRepository): PropertyRepositoryPort = JpaPropertyRepository(repository)
 
     @Bean
-    fun eventTypeRepositoryPort(jdbc: NamedParameterJdbcTemplate): EventTypeRepositoryPort = PostgresEventTypeRepository(jdbc)
+    fun eventTypeRepositoryPort(repository: EventTypeJpaRepository): EventTypeRepositoryPort = JpaEventTypeRepository(repository)
 
     @Bean
-    fun userAccountRepositoryPort(jdbc: NamedParameterJdbcTemplate): UserAccountRepositoryPort = PostgresUserAccountRepository(jdbc)
+    fun userAccountRepositoryPort(repository: UserAccountJpaRepository): UserAccountRepositoryPort = JpaUserAccountRepository(repository)
 
     // ----- Ingestion pipeline -----
 

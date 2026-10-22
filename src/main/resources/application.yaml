@@ -34,6 +34,19 @@ spring:
       initialization-fail-timeout: 5000
   flyway:
     enabled: true
+  jpa:
+    # Controllers and services never touch entities outside a repository call.
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc:
+          # Coalesce the worker's saveAll into multi-row INSERTs.
+          batch_size: 500
+          time_zone: UTC
+        order_inserts: true
+        order_updates: true
 
 management:
   endpoints:

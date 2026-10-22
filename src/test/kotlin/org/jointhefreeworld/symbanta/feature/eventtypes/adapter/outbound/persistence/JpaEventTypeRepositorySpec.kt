@@ -24,16 +24,15 @@ import io.kotest.matchers.shouldBe
 import org.jointhefreeworld.symbanta.feature.properties.domain.Property
 import org.jointhefreeworld.symbanta.shared.domain.PropertyId
 import org.jointhefreeworld.symbanta.support.TestDatabase
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
+import org.jointhefreeworld.symbanta.support.TestPersistence
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
-class PostgresEventTypeRepositorySpec :
+class JpaEventTypeRepositorySpec :
     FunSpec({
 
-        val jdbcTemplate = TestDatabase.jdbcTemplate
-        val repository = PostgresEventTypeRepository(jdbcTemplate)
+        val repository = TestPersistence.eventTypes
         val now = Instant.now().truncatedTo(ChronoUnit.MICROS)
 
         beforeSpec {
@@ -46,13 +45,7 @@ class PostgresEventTypeRepositorySpec :
 
         fun createProperty(domain: String): Property {
             val property = Property(PropertyId(UUID.randomUUID()), domain, now, null)
-            jdbcTemplate.update(
-                "INSERT INTO properties (id, domain, created_at) VALUES (:id, :domain, :createdAt)",
-                MapSqlParameterSource()
-                    .addValue("id", property.id.value)
-                    .addValue("domain", property.domain)
-                    .addValue("createdAt", java.sql.Timestamp.from(now)),
-            )
+            TestPersistence.propertyRepository.save(property)
             return property
         }
 
@@ -77,6 +70,16 @@ class PostgresEventTypeRepositorySpec :
             second.id shouldBe first.id
             second.createdAt shouldBe first.createdAt
             second.description shouldBe "Completed signup"
+        }
+
+        test("registers a set of names, ignoring blanks and duplicates") {
+            val property = createProperty("example.com")
+
+            val registered =
+                repository.registerAllIfAbsent(property.id, setOf("click", " click ", "", "signup-click"), now)
+
+            registered.map { it.name } shouldBe listOf("click", "signup-click")
+            repository.listForDomain("example.com").map { it.name } shouldBe listOf("click", "signup-click")
         }
 
         test("lists event types per domain, sorted by name") {

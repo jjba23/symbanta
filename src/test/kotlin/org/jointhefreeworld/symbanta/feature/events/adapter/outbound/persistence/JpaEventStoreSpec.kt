@@ -18,6 +18,7 @@
 
 package org.jointhefreeworld.symbanta.feature.events.adapter.outbound.persistence
 
+import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import org.jointhefreeworld.symbanta.feature.events.port.outbound.EventStorePort
 import org.jointhefreeworld.symbanta.feature.events.port.outbound.EventStorePortContract
@@ -26,48 +27,36 @@ import org.jointhefreeworld.symbanta.support.AnalyticsFixtures
 import org.jointhefreeworld.symbanta.support.AnalyticsFixtures.event
 import org.jointhefreeworld.symbanta.support.EventStoreFixture
 import org.jointhefreeworld.symbanta.support.TestDatabase
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
-import java.sql.Timestamp
+import org.jointhefreeworld.symbanta.support.TestPersistence
 
-class PostgresEventStoreSpec : EventStorePortContract(PostgresEventStoreFixture())
+class JpaEventStoreSpec : EventStorePortContract(JpaEventStoreFixture())
 
-/** Seeding for the PostgreSQL store: migrations, property rows and row counting. */
-class PostgresEventStoreFixture(
-    private val jdbcTemplate: NamedParameterJdbcTemplate = TestDatabase.jdbcTemplate,
-) : EventStoreFixture {
+/** Seeding for the JPA store: migrations, properties and row counting. */
+class JpaEventStoreFixture : EventStoreFixture {
     override fun createStore(): EventStorePort {
         TestDatabase.migrate()
-        return PostgresEventStore(jdbcTemplate)
+        return TestPersistence.eventStore
     }
 
     override fun createProperty(domain: String): Property {
         TestDatabase.migrate()
         val property = AnalyticsFixtures.property(domain)
-
-        jdbcTemplate.update(
-            "INSERT INTO properties (id, domain, created_at) VALUES (:id, :domain, :createdAt)",
-            MapSqlParameterSource()
-                .addValue("id", property.id.value)
-                .addValue("domain", property.domain)
-                .addValue("createdAt", Timestamp.from(property.createdAt)),
-        )
-
+        TestPersistence.propertyRepository.save(property)
         return property
     }
 
     override fun reset() = TestDatabase.truncate()
 
-    override fun eventCount(): Long = jdbcTemplate.jdbcTemplate.queryForObject("SELECT COUNT(*) FROM events", Long::class.java) ?: 0L
+    override fun eventCount(): Long = TestPersistence.events.count()
 }
 
 /**
  * Adapter-specific assertions that go beyond the shared contract.
  */
-class PostgresEventStoreColumnsSpec :
-    io.kotest.core.spec.style.FunSpec({
+class JpaEventStoreColumnsSpec :
+    FunSpec({
 
-        val fixture = PostgresEventStoreFixture()
+        val fixture = JpaEventStoreFixture()
         val store = fixture.createStore()
 
         beforeSpec {

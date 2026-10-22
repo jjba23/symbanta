@@ -102,7 +102,7 @@
         <!-- Database dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-jdbc</artifactId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -238,6 +238,30 @@
         <sourceDirectory>${project.basedir}/src/main/kotlin</sourceDirectory>
         <testSourceDirectory>${project.basedir}/src/test/kotlin</testSourceDirectory>
         <plugins>
+            <!--
+              Builds (notably the deployment job, which rebuilds in place in a reused checkout) can
+              see target/classes still holding classes from packages that were moved or deleted since
+              the previous build. A Kotlin incremental compile leaves them untouched, so they stay on
+              the classpath and collide with their replacements when component scanning meets two
+              different classes with the same simple name (ConflictingBeanDefinitionException).
+              Cleaning at the start of every lifecycle build keeps the output equal to the current
+              source tree; it costs nothing measurable here because fabrikt regenerates its sources on
+              every build anyway.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-clean-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>clean-stale-output</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>

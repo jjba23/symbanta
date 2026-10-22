@@ -18,49 +18,33 @@
 
 package org.jointhefreeworld.symbanta.feature.statistics.adapter.outbound.persistence
 
-import org.jointhefreeworld.symbanta.feature.events.adapter.outbound.persistence.PostgresEventStore
 import org.jointhefreeworld.symbanta.feature.events.domain.AnalyticsEvent
-import org.jointhefreeworld.symbanta.feature.events.port.outbound.EventStorePort
 import org.jointhefreeworld.symbanta.feature.properties.domain.Property
 import org.jointhefreeworld.symbanta.feature.statistics.port.outbound.AnalyticsQueryPort
 import org.jointhefreeworld.symbanta.feature.statistics.port.outbound.AnalyticsQueryPortContract
 import org.jointhefreeworld.symbanta.support.AnalyticsFixtures
 import org.jointhefreeworld.symbanta.support.AnalyticsQueryFixture
 import org.jointhefreeworld.symbanta.support.TestDatabase
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
-import java.sql.Timestamp
+import org.jointhefreeworld.symbanta.support.TestPersistence
 
-class PostgresAnalyticsQueryAdapterSpec : AnalyticsQueryPortContract(PostgresAnalyticsQueryFixture())
+class JpaAnalyticsQueryAdapterSpec : AnalyticsQueryPortContract(JpaAnalyticsQueryFixture())
 
-/** Seeds the PostgreSQL adapter through the real event store, so it exercises written rows. */
-class PostgresAnalyticsQueryFixture(
-    private val jdbcTemplate: NamedParameterJdbcTemplate = TestDatabase.jdbcTemplate,
-) : AnalyticsQueryFixture {
-    private val store: EventStorePort by lazy { PostgresEventStore(jdbcTemplate) }
-
+/** Seeds the JPA adapter through the real event store, so it exercises written rows. */
+class JpaAnalyticsQueryFixture : AnalyticsQueryFixture {
     override fun createQueries(): AnalyticsQueryPort {
         TestDatabase.migrate()
-        return PostgresAnalyticsQueryAdapter(jdbcTemplate)
+        return TestPersistence.analytics
     }
 
     override fun createProperty(domain: String): Property {
         TestDatabase.migrate()
         val property = AnalyticsFixtures.property(domain)
-
-        jdbcTemplate.update(
-            "INSERT INTO properties (id, domain, created_at) VALUES (:id, :domain, :createdAt)",
-            MapSqlParameterSource()
-                .addValue("id", property.id.value)
-                .addValue("domain", property.domain)
-                .addValue("createdAt", Timestamp.from(property.createdAt)),
-        )
-
+        TestPersistence.propertyRepository.save(property)
         return property
     }
 
     override fun write(events: List<AnalyticsEvent>) {
-        store.saveAll(events)
+        TestPersistence.eventStore.saveAll(events)
     }
 
     override fun reset() = TestDatabase.truncate()

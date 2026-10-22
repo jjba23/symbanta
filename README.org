@@ -17,7 +17,7 @@ Instead of profiling individuals or building invasive cross-site identities, Sym
 
 * Technical Architecture
 
-Symbanta is organised as a hexagonal (ports and adapters) application. Dependencies point inwards: the domain and the application layer never import Spring, JDBC, HTTP or the generated OpenAPI classes.
+Symbanta is organised as a hexagonal (ports and adapters) application. Dependencies point inwards: the domain and the application layer never import Spring, JPA, JDBC, HTTP or the generated OpenAPI classes.
 
 #+begin_src text
   feature/<name>/domain                        plain Kotlin entities and domain services
@@ -25,7 +25,7 @@ Symbanta is organised as a hexagonal (ports and adapters) application. Dependenc
   feature/<name>/port/outbound                 capabilities the application needs
   feature/<name>/service                       use case implementations
   feature/<name>/adapter/inbound/...           HTTP controllers, security SPI, seeders
-  feature/<name>/adapter/outbound/...          PostgreSQL stores, CDN headers, queue workers
+  feature/<name>/adapter/outbound/...          Spring Data JPA repositories, CDN headers, queue workers
   shared/{domain,port,adapter}                 identifiers, reporting periods, errors, clock
   config/                                      composition root
 #+end_src
@@ -33,7 +33,7 @@ Symbanta is organised as a hexagonal (ports and adapters) application. Dependenc
 Everything is grouped by feature, and inside a feature by the hexagonal role:
 
 - ~events~: ingestion (validate and enqueue), the durable writer, the bounded queue, geolocation.
-- ~statistics~: summary, time series, routes, screen sizes, user agents, events and countries; the read-side query port and its PostgreSQL adapter.
+- ~statistics~: summary, time series, routes, screen sizes, user agents, events and countries; the read-side query port and its JPA adapter.
 - ~properties~, ~eventtypes~, ~auth~, ~console~, ~telemetry~: one feature per domain concern, each with its own ports, services and adapters.
 - ~shared~: the kernel every feature may depend on — =PropertyId=, =EventId=, =DateRange=, =TimePeriod=, the reporting period resolver, the exceptions and the clock port.
 - Composition root: ~config/WiringConfig~ is the only place where ports are bound to implementations. Replacing PostgreSQL, or the in-process queue for a broker, is a change confined to that file.
@@ -44,9 +44,9 @@ The server backend is implemented using modern infrastructure designed for high 
 
 - Telemetry Snippet: Integrating symbanta into your project is extremely lightweight and customizable ✨, even See [[file:src/main/resources/js/symbanta.js][vanilla self-contained JavaScript client]] (~10 KB, ≈2.5 KB gzipped) containing zero external dependencies.
 
-- Asynchronous Event Queue: Fire-and-forget ingestion over a bounded Kotlin Coroutines queue (a fixed worker pool on =Dispatchers.IO=). The API always answers =202 Accepted= immediately while database writes happen off the HTTP thread pool. Workers coalesce whatever is queued into one JDBC batch per write, so throughput is bound by batches rather than events. When the burst exceeds the queue capacity the excess is dropped with a rate-limited warning (and a counter) instead of exhausting the JDBC pool or the heap.
+- Asynchronous Event Queue: Fire-and-forget ingestion over a bounded Kotlin Coroutines queue (a fixed worker pool on =Dispatchers.IO=). The API always answers =202 Accepted= immediately while database writes happen off the HTTP thread pool. Workers coalesce whatever is queued into one batched write (Hibernate JDBC batching) per flush, so throughput is bound by batches rather than events. When the burst exceeds the queue capacity the excess is dropped with a rate-limited warning (and a counter) instead of exhausting the JDBC pool or the heap.
 
-- Storage Layer: PostgreSQL featuring native =jsonb= document support for extensible payload properties, managed strictly via Flyway schema migrations.
+- Storage Layer: PostgreSQL accessed through Spring Data JPA (Hibernate), with native =jsonb= document support for extensible payload properties, managed strictly via Flyway schema migrations. No hand-written JDBC: entities map the tables, Spring Data repositories provide the CRUD, and the dashboard aggregates are JPQL queries. The only native SQL left is the session active-duration window function (`LAG`), which JPQL cannot express.
 
 - REST API Runtime Environment is Java 25 & Kotlin 2.4 built upon Spring Boot 4.1.
 
@@ -336,9 +336,9 @@ Treat these as a regression baseline, not as a capacity promise.
 | =ReportingPeriodResolver.resolve= (CUSTOM window)  | 447 ns/op (2.2M ops/s)                                  |
 | Ingestion request path (validate + enqueue)        | 751 ns/event (1.33M events/s)                           |
 | Worker batch write, in-memory store (500/batch)    | 70 ns/event (14.3M events/s)                            |
-| =POST /v1/events/register=, 8 connections          | 3.2k req/s, p50 2.1 ms, p95 5.0 ms, p99 7.2 ms, 0 errors |
-| =POST /v1/events/register=, 32 connections         | 4.4k req/s, p50 6.5 ms, p95 14 ms, p99 19 ms, 0 errors   |
-| Durable writer, batched, 32 connections            | ~4.7-5k events/s, 0 dropped, backlog drains to 0         |
+| =POST /v1/events/register=, 8 connections          | 2.2k req/s, p50 3.0 ms, p95 6.9 ms, p99 10.6 ms, 0 errors |
+| =POST /v1/events/register=, 32 connections         | 3.6k req/s, p50 7.6 ms, p95 18 ms, p99 25 ms, 0 errors   |
+| Durable writer, batched, 32 connections            | 58,865 events stored, 0 dropped, 0 failed, backlog 0     |
 | Dashboard queries, 8 connections, 7 endpoints      | 31 iterations/s, p95 419 ms                             |
 
 Ingestion used to write one row per event, which topped out around 3k events/s on this machine: at
@@ -347,14 +347,19 @@ coalesces the queue into one multi-row =INSERT= per flush, so a burst of events 
 round trips instead of one per event. Re-running the same load after the change shows the whole burst
 accepted and durably written with zero drops:
 
-- 8 connections, 10 s: 32,252 events accepted at 3.2k req/s, all 32,252 stored, =dropped= 0.
-- 32 connections, 10 s: 43,792 events accepted at 4.4k req/s, all stored, =dropped= 0, and
+- 8 connections, 10 s: 22,458 events accepted, all 22,458 stored, =dropped= 0, =failed= 0.
+- 32 connections, 10 s: 58,865 events accepted at 3.6k req/s, all stored, =dropped= 0, and
   =symbanta_ingestion_queue_backlog= returned to 0 within a second of the load stopping.
 
 HTTP keeps answering =202= in a few milliseconds meanwhile: no connection-pool collapse and no
 unbounded memory growth. An earlier unbounded variant of this dispatcher did collapse under the same
 load (JDBC pool exhausted, requests timing out), which is why the queue stays bounded and
 configurable through =application.ingestion.queue-capacity= / =worker-count= / =max-batch-size=.
+
+These numbers are from the Spring Data JPA persistence layer. Compared with the previous hand-written
+JDBC adapter, accepted HTTP throughput on the same 8-connection run drops from ~3.2k to ~2.2k req/s,
+the cost of Hibernate entity management per event; durability, zero drops and the throughput at 32
+connections (~3.6k req/s accepted) are unchanged.
 
 ** Testing outbound adapters
 
@@ -363,9 +368,12 @@ The analytics outbound ports have reusable contract suites:
 - ~AnalyticsQueryPortContract~ (statistics) and ~EventStorePortContract~ (events) live next to their
   ports under ~src/test/kotlin~ and take a small fixture that creates the adapter, seeds a property
   and resets state.
-- The PostgreSQL specs extend them, so aggregation, ordering, window and batch semantics are
-  identical for every adapter and a future implementation cannot silently diverge. Its own spec only
-  supplies the fixture plus adapter-specific assertions (columns, SQL details).
+- The JPA specs extend them, so aggregation, ordering, window and batch semantics are identical for
+  every adapter and a future implementation cannot silently diverge. Its own spec only supplies the
+  fixture plus adapter-specific assertions (columns, JSON mapping).
+- ~support/TestPersistence~ boots a minimal JPA context (datasource, entity manager, transactions,
+  repositories) against the Testcontainers database, so the specs exercise the same Spring Data
+  proxies and `@Transactional` boundaries as the running application.
 
 ----------------
 

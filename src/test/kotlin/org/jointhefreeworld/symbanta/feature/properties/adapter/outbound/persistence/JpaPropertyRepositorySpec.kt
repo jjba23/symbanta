@@ -26,14 +26,15 @@ import io.kotest.matchers.shouldBe
 import org.jointhefreeworld.symbanta.feature.properties.domain.Property
 import org.jointhefreeworld.symbanta.shared.domain.PropertyId
 import org.jointhefreeworld.symbanta.support.TestDatabase
+import org.jointhefreeworld.symbanta.support.TestPersistence
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
-class PostgresPropertiesRepositorySpec :
+class JpaPropertyRepositorySpec :
     FunSpec({
 
-        val repository = PostgresPropertiesRepository(TestDatabase.jdbcTemplate)
+        val repository = TestPersistence.propertyRepository
         val baseTime = Instant.now().truncatedTo(ChronoUnit.MICROS)
 
         beforeSpec {
@@ -86,7 +87,7 @@ class PostgresPropertiesRepositorySpec :
             }
         }
 
-        context("save updates existing property on ID conflict (upsert behavior)") {
+        context("save updates an existing property (upsert behavior)") {
             val propertyId = PropertyId(UUID.randomUUID())
 
             data class UpsertTestCase(
@@ -116,17 +117,27 @@ class PostgresPropertiesRepositorySpec :
             }
         }
 
-        test("all() fetches every saved record") {
+        test("all() fetches every saved record ordered by domain") {
             val properties =
                 listOf(
-                    Property(PropertyId(UUID.randomUUID()), "alpha.com", baseTime, null),
                     Property(PropertyId(UUID.randomUUID()), "beta.com", baseTime, baseTime),
+                    Property(PropertyId(UUID.randomUUID()), "alpha.com", baseTime, null),
                 )
 
             properties.forEach { repository.save(it) }
 
-            val result = repository.all()
-            result.map { it.domain } shouldBe listOf("alpha.com", "beta.com")
+            repository.all().map { it.domain } shouldBe listOf("alpha.com", "beta.com")
+        }
+
+        test("byDomains resolves a batch in one call and skips unknown domains") {
+            val alpha = Property(PropertyId(UUID.randomUUID()), "alpha.com", baseTime, null)
+            val beta = Property(PropertyId(UUID.randomUUID()), "beta.com", baseTime, null)
+            listOf(alpha, beta).forEach { repository.save(it) }
+
+            val found = repository.byDomains(setOf("alpha.com", "missing.com"))
+
+            found.keys shouldBe setOf("alpha.com")
+            found["alpha.com"]?.id shouldBe alpha.id
         }
 
         test("byDomain returns null when the record is missing") {

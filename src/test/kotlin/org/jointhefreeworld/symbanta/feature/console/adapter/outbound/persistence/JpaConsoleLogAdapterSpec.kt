@@ -23,22 +23,19 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.jointhefreeworld.symbanta.feature.console.domain.ConsoleLogLevel
-import org.jointhefreeworld.symbanta.feature.events.adapter.outbound.persistence.PostgresEventStore
 import org.jointhefreeworld.symbanta.feature.events.domain.EventNames
 import org.jointhefreeworld.symbanta.feature.properties.domain.Property
 import org.jointhefreeworld.symbanta.support.AnalyticsFixtures
 import org.jointhefreeworld.symbanta.support.AnalyticsFixtures.BASE_TIME
 import org.jointhefreeworld.symbanta.support.AnalyticsFixtures.event
 import org.jointhefreeworld.symbanta.support.TestDatabase
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
-import java.sql.Timestamp
+import org.jointhefreeworld.symbanta.support.TestPersistence
 
-class PostgresConsoleLogAdapterSpec :
+class JpaConsoleLogAdapterSpec :
     FunSpec({
 
-        val jdbcTemplate = TestDatabase.jdbcTemplate
-        val store = PostgresEventStore(jdbcTemplate)
-        val logs = PostgresConsoleLogAdapter(jdbcTemplate)
+        val store = TestPersistence.eventStore
+        val logs = TestPersistence.consoleLogs
 
         beforeSpec {
             TestDatabase.migrate()
@@ -50,13 +47,7 @@ class PostgresConsoleLogAdapterSpec :
 
         fun createProperty(domain: String): Property {
             val property = AnalyticsFixtures.property(domain)
-            jdbcTemplate.update(
-                "INSERT INTO properties (id, domain, created_at) VALUES (:id, :domain, :createdAt)",
-                MapSqlParameterSource()
-                    .addValue("id", property.id.value)
-                    .addValue("domain", property.domain)
-                    .addValue("createdAt", Timestamp.from(property.createdAt)),
-            )
+            TestPersistence.propertyRepository.save(property)
             return property
         }
 
