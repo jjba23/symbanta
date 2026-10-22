@@ -30,9 +30,11 @@ import java.util.UUID
  * Spring Data repository of the event log.
  *
  * Writes go through [org.springframework.data.repository.CrudRepository.saveAll]; the dashboard
- * reads are JPQL aggregations declared here because they all describe the same table. The single
- * native query is the session active-duration window function, which JPQL cannot express
- * (`LAG` over each session's events).
+ * reads are JPQL aggregations declared here because they all describe the same table. Two queries
+ * are native because JPQL cannot express them: the session active-duration window function (`LAG`
+ * over each session's events) and the locale-aligned time-series buckets (`date_trunc` in the
+ * reporting time zone, which plain JPQL has no way to spell or to keep independent of the
+ * database session's `TimeZone`).
  */
 interface EventJpaRepository : JpaRepository<EventEntity, UUID> {
     @Query(
@@ -111,22 +113,29 @@ interface EventJpaRepository : JpaRepository<EventEntity, UUID> {
         @Param("pageView") pageView: String,
     ): SessionBehaviourRow
 
+    /**
+     * Buckets by local wall-clock hour/day in `zone`: truncating a `timestamptz` directly would
+     * use the database session's `TimeZone`, which is not necessarily the reporting time zone and
+     * made every bucket key miss the ones the adapter generates.
+     */
     @Query(
-        """
-        select function('date_trunc', cast(:granularity as string), e.createdAt) as bucket,
-               sum(case when e.name = :pageView then 1 else 0 end) as pageViews,
-               count(distinct e.sessionId) as visitors
-        from EventEntity e
-        where e.propertyId = :propertyId
-          and e.createdAt >= :from and e.createdAt <= :to
-        group by 1
+        value = """
+        SELECT date_trunc(:granularity, e.created_at AT TIME ZONE :zone) AT TIME ZONE :zone AS "bucket",
+               COUNT(*) FILTER (WHERE e.event_name = :pageView) AS "pageViews",
+               COUNT(DISTINCT e.session_id) AS "visitors"
+        FROM events e
+        WHERE e.property_id = :propertyId
+          AND e.created_at >= :from AND e.created_at < :to
+        GROUP BY 1
         """,
+        nativeQuery = true,
     )
     fun timeSeries(
         @Param("propertyId") propertyId: UUID,
         @Param("from") from: Instant,
         @Param("to") to: Instant,
         @Param("granularity") granularity: String,
+        @Param("zone") zone: String,
         @Param("pageView") pageView: String,
     ): List<TimeSeriesRow>
 

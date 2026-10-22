@@ -33,9 +33,12 @@ import org.jointhefreeworld.symbanta.feature.statistics.domain.TimeSeriesPoint
 import org.jointhefreeworld.symbanta.feature.statistics.domain.UserAgentStat
 import org.jointhefreeworld.symbanta.feature.statistics.port.outbound.AnalyticsQueryPort
 import org.jointhefreeworld.symbanta.shared.domain.DateRange
+import org.jointhefreeworld.symbanta.shared.domain.ReportingPeriodResolver
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.time.Instant
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
 /**
@@ -45,8 +48,9 @@ import java.time.temporal.ChronoUnit
  * every aggregate is a JPQL query on [EventJpaRepository]; the domain's event window is resolved
  * once per call and an unknown domain yields zeroes/empty lists, exactly like the previous SQL.
  *
- * Time-series buckets are generated in Kotlin and merged with the grouped rows so the result is
- * zero-filled even for windows without traffic.
+ * Time-series buckets are generated in the reporting time zone and merged with the grouped rows so
+ * the result is zero-filled even for windows without traffic, and every bucket timestamp is the
+ * local start of that hour/day (the same key the SQL truncation produces).
  */
 open class JpaAnalyticsQueryAdapter(
     private val properties: PropertyRepositoryPort,
@@ -94,8 +98,14 @@ open class JpaAnalyticsQueryAdapter(
                 emptyMap()
             } else {
                 events
-                    .timeSeries(property.id.value, range.from, range.to, granularity.unit, EventNames.PAGE_VIEW)
-                    .associate { it.bucket to it }
+                    .timeSeries(
+                        property.id.value,
+                        range.from,
+                        range.to,
+                        granularity.unit,
+                        ReportingPeriodResolver.TIMEZONE,
+                        EventNames.PAGE_VIEW,
+                    ).associate { it.bucket to it }
             }
 
         return buckets.map { bucket ->
@@ -178,24 +188,63 @@ open class JpaAnalyticsQueryAdapter(
             .map { CountryStat(country = it.country, pageViews = it.pageViews ?: 0, visitors = it.visitors) }
     }
 
+    /**
+     * Start instants of every bucket that overlaps the window, in the reporting time zone.
+     *
+     * The window is half-open (`from` inclusive, `to` exclusive): a window that ends exactly on a
+     * bucket boundary does not grow a permanently empty trailing point, while a window that ends
+     * mid-bucket (`TODAY` ends at "now") still includes the bucket the current time falls in.
+     */
     private fun bucketsOf(
         range: DateRange,
         granularity: TimeGranularity,
     ): List<Instant> {
-        val unit = if (granularity == TimeGranularity.HOUR) ChronoUnit.HOURS else ChronoUnit.DAYS
-        val step = if (granularity == TimeGranularity.HOUR) 1L else 24L
+        val zone = ReportingPeriodResolver.ZONE_ID
+        val first = bucketStart(range.from, zone, granularity)
+        val endBucket = bucketStart(range.to, zone, granularity)
+        val last = if (endBucket.toInstant() == range.to) previousBucket(endBucket, granularity) else endBucket
+
+        if (last.isBefore(first)) return emptyList()
 
         val buckets = mutableListOf<Instant>()
-        var cursor = range.from.truncatedTo(unit)
-        val last = range.to.truncatedTo(unit)
-
+        var cursor = first
         while (!cursor.isAfter(last)) {
-            buckets += cursor
-            cursor = cursor.plus(step, ChronoUnit.HOURS)
+            buckets += cursor.toInstant()
+            cursor = nextBucket(cursor, granularity)
         }
 
         return buckets
     }
+
+    private fun bucketStart(
+        instant: Instant,
+        zone: ZoneId,
+        granularity: TimeGranularity,
+    ): ZonedDateTime =
+        when (granularity) {
+            // Whole-hour offsets make wall-clock truncation safe; going through the local date for
+            // days avoids inventing a midnight that does not exist on a DST transition.
+            TimeGranularity.HOUR -> instant.atZone(zone).truncatedTo(ChronoUnit.HOURS)
+            TimeGranularity.DAY -> instant.atZone(zone).toLocalDate().atStartOfDay(zone)
+        }
+
+    private fun nextBucket(
+        bucket: ZonedDateTime,
+        granularity: TimeGranularity,
+    ): ZonedDateTime =
+        when (granularity) {
+            TimeGranularity.HOUR -> bucket.plusHours(1)
+            TimeGranularity.DAY -> bucket.plusDays(1)
+        }
+
+    private fun previousBucket(
+        bucket: ZonedDateTime,
+        granularity: TimeGranularity,
+    ): ZonedDateTime =
+        when (granularity) {
+            TimeGranularity.HOUR -> bucket.minusHours(1)
+            TimeGranularity.DAY -> bucket.minusDays(1)
+        }
 
     private companion object {
         val EMPTY_SUMMARY = StatsSummary(pageViews = 0, visitors = 0, bounceRate = BigDecimal.ZERO, averageDurationMillis = BigDecimal.ZERO)

@@ -111,7 +111,9 @@ Lists all domains registered for telemetry tracking.
 Calculates privacy-safe metric aggregates (=pageViews=, =visitors=, =bounceRate=, =averageDurationMillis=) over standard periods (=LAST_24_HOURS=, =LAST_7_DAYS=, =LAST_30_DAYS=, =LAST_6_MONTHS=, =LAST_12_MONTHS=, or =CUSTOM=).
 
 =GET /v1/stats/timeseries=
-Outputs time-bucketed (hourly or daily) metrics for graph rendering.
+Outputs time-bucketed (hourly or daily) metrics for graph rendering. Buckets are zero-filled and
+start at the local hour/day in =Europe/Amsterdam= (the reporting time zone), independent of the
+database session time zone; the requested window is half-open, so =to= is exclusive.
 
 =GET /v1/stats/events=
 Occurrence counts and distinct visitors per event name, including custom and business events.

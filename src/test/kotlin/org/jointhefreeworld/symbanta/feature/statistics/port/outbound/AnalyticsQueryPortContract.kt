@@ -20,8 +20,10 @@ package org.jointhefreeworld.symbanta.feature.statistics.port.outbound
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import org.jointhefreeworld.symbanta.TestPrelude.amsterdamStartOfDayInstant
 import org.jointhefreeworld.symbanta.feature.events.domain.EventNames
 import org.jointhefreeworld.symbanta.feature.properties.domain.Property
 import org.jointhefreeworld.symbanta.feature.statistics.domain.TimeGranularity
@@ -30,6 +32,7 @@ import org.jointhefreeworld.symbanta.support.AnalyticsFixtures.event
 import org.jointhefreeworld.symbanta.support.AnalyticsFixtures.range
 import org.jointhefreeworld.symbanta.support.AnalyticsQueryFixture
 import java.math.BigDecimal
+import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 /**
@@ -113,9 +116,87 @@ abstract class AnalyticsQueryPortContract(
 
                 val points = queries.timeSeries(property.domain, range(from = from, to = to), TimeGranularity.HOUR)
 
+                points shouldHaveSize 2
                 points.first().pageViews shouldBe 1
                 points.first().visitors shouldBe 1
                 points.sumOf { it.pageViews } shouldBe 1
+                points.last().pageViews shouldBe 0
+            }
+
+            test("returns daily buckets at local midnight of the reporting time zone") {
+                val from = amsterdamStartOfDayInstant(2026, 1, 9)
+                val to = amsterdamStartOfDayInstant(2026, 1, 11)
+
+                fixture.write(listOf(event(property, createdAt = BASE_TIME)))
+
+                val points = queries.timeSeries(property.domain, range(from = from, to = to), TimeGranularity.DAY)
+
+                points.map { it.timestamp } shouldContainExactly
+                    listOf(Instant.parse("2026-01-08T23:00:00Z"), Instant.parse("2026-01-09T23:00:00Z"))
+                points.map { it.pageViews } shouldContainExactly listOf(0L, 1L)
+                points.last().visitors shouldBe 1
+            }
+
+            test("assigns an event just after local midnight to that local day") {
+                // 2026-01-09T00:30 in Amsterdam is still 2026-01-08 in UTC.
+                fixture.write(listOf(event(property, createdAt = Instant.parse("2026-01-08T23:30:00Z"))))
+
+                val points =
+                    queries.timeSeries(
+                        property.domain,
+                        range(from = amsterdamStartOfDayInstant(2026, 1, 9), to = amsterdamStartOfDayInstant(2026, 1, 10)),
+                        TimeGranularity.DAY,
+                    )
+
+                points shouldHaveSize 1
+                points.single().timestamp shouldBe amsterdamStartOfDayInstant(2026, 1, 9)
+                points.single().pageViews shouldBe 1
+            }
+
+            test("counts only page views as page views but every session as a visitor") {
+                val from = BASE_TIME.truncatedTo(ChronoUnit.HOURS)
+
+                fixture.write(
+                    listOf(
+                        event(property, sessionId = "s-1", createdAt = from.plusSeconds(60)),
+                        event(property, name = "signup-click", sessionId = "s-2", createdAt = from.plusSeconds(120)),
+                    ),
+                )
+
+                val point =
+                    queries
+                        .timeSeries(property.domain, range(from = from, to = from.plusSeconds(3_600)), TimeGranularity.HOUR)
+                        .single()
+
+                point.pageViews shouldBe 1
+                point.visitors shouldBe 2
+            }
+
+            test("returns zero-filled buckets for an unknown domain") {
+                val points =
+                    queries.timeSeries(
+                        "missing.example",
+                        range(from = amsterdamStartOfDayInstant(2026, 1, 9), to = amsterdamStartOfDayInstant(2026, 1, 11)),
+                        TimeGranularity.DAY,
+                    )
+
+                points shouldHaveSize 2
+                points.map { it.pageViews } shouldContainExactly listOf(0L, 0L)
+                points.map { it.visitors } shouldContainExactly listOf(0L, 0L)
+            }
+
+            test("excludes events outside the half-open window") {
+                val from = amsterdamStartOfDayInstant(2026, 1, 9)
+                val to = amsterdamStartOfDayInstant(2026, 1, 10)
+
+                fixture.write(
+                    listOf(
+                        event(property, sessionId = "s-1", createdAt = from.minusSeconds(1)),
+                        event(property, sessionId = "s-2", createdAt = to),
+                    ),
+                )
+
+                queries.timeSeries(property.domain, range(from = from, to = to), TimeGranularity.DAY).single().pageViews shouldBe 0
             }
         }
 

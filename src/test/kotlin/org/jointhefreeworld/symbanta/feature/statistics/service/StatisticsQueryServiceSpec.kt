@@ -40,6 +40,7 @@ import org.jointhefreeworld.symbanta.shared.port.outbound.ClockPort
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.reset
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.math.BigDecimal
@@ -70,6 +71,10 @@ class StatisticsQueryServiceSpec :
                 from = amsterdamStartOfDayInstant(2026, 1, 1),
                 to = amsterdamStartOfDayInstant(2026, 1, 11),
             )
+
+        beforeTest {
+            reset(queries)
+        }
 
         context("summary") {
             test("resolves the requested period and returns the resolved window") {
@@ -115,6 +120,48 @@ class StatisticsQueryServiceSpec :
                     )
 
                 result.granularity shouldBe TimeGranularity.DAY
+            }
+
+            test("uses hourly buckets for a custom window of at most 48 hours") {
+                whenever(queries.timeSeries(any(), any(), any())).thenReturn(emptyList())
+
+                val result =
+                    service.timeSeries(
+                        StatsQuery(
+                            domain = "example.com",
+                            period =
+                                PeriodSelection(
+                                    period = TimePeriod.CUSTOM,
+                                    startDate = LocalDate.of(2026, 1, 1),
+                                    endDate = LocalDate.of(2026, 1, 2),
+                                ),
+                        ),
+                    )
+
+                result.granularity shouldBe TimeGranularity.HOUR
+                result.from shouldBe amsterdamStartOfDayInstant(2026, 1, 1)
+                result.to shouldBe amsterdamStartOfDayInstant(2026, 1, 3)
+                verify(queries).timeSeries(eq("example.com"), any(), eq(TimeGranularity.HOUR))
+            }
+
+            test("uses daily buckets for a custom window longer than 48 hours") {
+                whenever(queries.timeSeries(any(), any(), any())).thenReturn(emptyList())
+
+                val result =
+                    service.timeSeries(
+                        StatsQuery(
+                            domain = "example.com",
+                            period =
+                                PeriodSelection(
+                                    period = TimePeriod.CUSTOM,
+                                    startDate = LocalDate.of(2026, 1, 1),
+                                    endDate = LocalDate.of(2026, 1, 3),
+                                ),
+                        ),
+                    )
+
+                result.granularity shouldBe TimeGranularity.DAY
+                verify(queries).timeSeries(eq("example.com"), any(), eq(TimeGranularity.DAY))
             }
         }
 
