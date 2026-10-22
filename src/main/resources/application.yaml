@@ -54,6 +54,10 @@ logging:
 
 
 application:
+  # Asynchronous ingestion queue (see CoroutineEventDispatcher)
+  ingestion:
+    queue-capacity: 10000
+    worker-count: 8
   user-seeder:
     users: []
       # - username: admin

@@ -17,11 +17,28 @@ Instead of profiling individuals or building invasive cross-site identities, Sym
 
 * Technical Architecture
 
+Symbanta is organised as a hexagonal (ports and adapters) application. Dependencies point inwards: the domain and the application layer never import Spring, JDBC, HTTP or the generated OpenAPI classes.
+
+#+begin_src text
+  inbound adapters              inbound ports            use cases                  outbound ports             outbound adapters
+  HTTP controllers (Spring)  →  IngestEventUseCase    →  EventIngestionService   →  EventStorePort          →  PostgreSQL
+  Spring Security            →  Get*StatsUseCase      →  StatisticsQueryService  →  AnalyticsQueryPort      →  PostgreSQL
+  YAML seeders               →  ManageEventTypes...   →  EventTypeService        →  EventTypeRepositoryPort →  PostgreSQL
+  (CLI / tests)              →  GetConsoleLogsUseCase →  ConsoleLogService       →  GeoLocationPort         →  CDN headers
+                                                                                   →  ClockPort               →  system clock
+                                                                                   →  EventDispatchPort      →  coroutines
+#+end_src
+
+- Domain (~domain/model~, ~domain/service~): entities, value objects, statistics, reporting period maths, user agent and screen size aggregation. Plain Kotlin, testable with a fixed clock.
+- Application (~application/port~, ~application/service~): inbound ports state /what the application does/ (ingest an event, query statistics, register an event type); outbound ports state /what it needs/ (stores, clock, geolocation, work dispatch).
+- Adapters (~adapter/inbound/*~, ~adapter/outbound/*~): Spring MVC controllers implementing the generated OpenAPI contracts, Spring Security's user details SPI, YAML seeders, PostgreSQL repositories, the coroutine dispatcher, the header based geolocation resolver and the system clock.
+- Composition root: ~config/WiringConfig~ is the only place where ports are bound to implementations. Replacing PostgreSQL or the in-process dispatcher is a change confined to that file.
+
 The server backend is implemented using modern infrastructure designed for high throughput, strict domain isolation, and non-blocking asynchronous processing:
 
-- Telemetry Snippet: Integrating symbanta into your project is extremely lightweight and customizable ✨, even See [[file:src/main/resources/js/symbanta.js][vanilla self-contained JavaScript client]] (~3KB) containing zero external dependencies.
+- Telemetry Snippet: Integrating symbanta into your project is extremely lightweight and customizable ✨, even See [[file:src/main/resources/js/symbanta.js][vanilla self-contained JavaScript client]] (~10 KB, ≈2.5 KB gzipped) containing zero external dependencies.
 
-- Asynchronous Event Queue: Fire-and-forget background execution implemented via Kotlin Coroutines (=Dispatchers.IO= + =SupervisorJob=). The system immediately acknowledges event receipt (=202 Accepted= or =200 OK=) while database writes occur off the primary HTTP thread pool.
+- Asynchronous Event Queue: Fire-and-forget ingestion over a bounded Kotlin Coroutines queue (a fixed worker pool on =Dispatchers.IO=). The API always answers =202 Accepted= immediately while database writes happen off the HTTP thread pool; when the burst exceeds the queue capacity the excess is dropped with a rate-limited warning instead of exhausting the JDBC pool or the heap.
 
 - Storage Layer: PostgreSQL featuring native =jsonb= document support for extensible payload properties, managed strictly via Flyway schema migrations.
 
@@ -39,6 +56,9 @@ The server backend is implemented using modern infrastructure designed for high 
 | =data-endpoint= | Absolute HTTP URI of the Symbanta registration service        | =http://localhost:8080/v1/events/register= |
 | =data-domain=   | Domain property identifier registered in the database schema | =window.location.hostname=            |
 | =data-interval= | Active session heartbeat rate in milliseconds                 | =4000=                                |
+| =data-track-clicks= | Emit a =click= event for clicked links, buttons and =[data-symbanta-event]= elements | off |
+| =data-track-hovers= | Emit a throttled =hover= event the first time an element is hovered | off |
+| =data-capture-console= | Forward ~console.log/info/warn/error/debug~ as =console= events (message, level and stack in =props=) | off |
 
 -------
 
@@ -69,7 +89,9 @@ Symbanta exposes a REST API defined at [[file:src/main/resources/openapi.yaml]].
 *** Public & Ingestion Routes
 
 =POST /v1/events/register=
-Ingests anonymized user events (=page-view=, =heartbeat=, =visibility-change=).
+Ingests anonymized events. Any event name is accepted: the built-in ones (=page-view=, =heartbeat=,
+=visibility-change=, =console=) and arbitrary custom/business events. The request context
+(allow-listed headers, referrer, coarse country) is captured server-side.
 
 =GET /symbanta.js=
 Serves the static telemetry client JavaScript snippet.
@@ -85,6 +107,18 @@ Calculates privacy-safe metric aggregates (=pageViews=, =visitors=, =bounceRate=
 =GET /v1/stats/timeseries=
 Outputs time-bucketed (hourly or daily) metrics for graph rendering.
 
+=GET /v1/stats/events=
+Occurrence counts and distinct visitors per event name, including custom and business events.
+
+=GET /v1/stats/countries=
+Page views and visitors grouped by the coarse country of the client.
+
+=GET /v1/event-types= and =POST /v1/event-types=
+List or declare the event names an application may emit. Registration is idempotent.
+
+=GET /v1/logs=
+Recent ~console.log~ / ~console.error~ output forwarded by instrumented applications, filterable by level.
+
 ----------------------
 
 * Instrumenting
@@ -98,6 +132,39 @@ See [[file:./src/main/resources/js/symbanta.js][file:./src/main/resources/js/sym
 #+end_src
 
 --------------
+
+* Custom events, console capture and request context
+
+** Custom events
+
+Any event name is accepted, no migration or schema declaration is required: the first event of a
+new name registers the event type for that application automatically and makes it visible through
+=GET /v1/event-types= and =GET /v1/stats/events=.
+
+#+begin_src javascript
+window.symbanta.track("checkout-started", {cartSize: 3, currency: "EUR"});
+#+end_src
+
+Declarative markup works without JavaScript, when =data-track-clicks= is enabled:
+
+#+begin_src html
+<button data-symbanta-event="signup-click" data-symbanta-props='{"plan":"pro"}'>Sign up</button>
+#+end_src
+
+** Console capture
+
+With =data-capture-console= the snippet mirrors browser console output into Symbanta as =console=
+events (the original console methods still run). Read them back with =GET /v1/logs=.
+
+** Request context
+
+Every ingested event stores an allow-listed subset of request headers (=user-agent=,
+=accept-language=, =referer=, =origin=, =accept=, =sec-ch-ua*=, =dnt=, =sec-gpc=), the referrer
+(falling back to the =Referer= header when the payload omits one) and the coarse country of the
+caller. The country is resolved from CDN/proxy headers (=CF-IPCountry=, =X-Vercel-IP-Country=,
+=CloudFront-Viewer-Country=, ~X-Country-Code~, ~X-AppEngine-Country~, ~X-Geo-Country~). The raw IP
+address is used at most for that lookup and is never stored, in line with the project's privacy
+principles.
 
 * Properties
 
@@ -177,7 +244,58 @@ clean:
 
 Ensure your PostgreSQL instance is running and accessible via your Spring datasource environment variables !
 
-Database migrations for properties, events, and app_users will execute automatically on application boot via Flyway !
+Database migrations for properties, events, event_types and app_users will execute automatically on application boot via Flyway !
+
+The persistence specs use Testcontainers. If Docker is not available but Podman is, point
+Testcontainers at the Podman socket:
+
+#+begin_src shell
+podman system service --timeout=0 &
+DOCKER_HOST=unix:///run/user/$UID/podman/podman.sock TESTCONTAINERS_RYUK_DISABLED=true just test
+#+end_src
+
+------
+
+* Benchmarks
+
+Performance work is measured, not guessed. Two complementary harnesses live in the repository:
+
+1. *JVM benchmarks* (~just bench~): dependency-free harness that warms up, runs several rounds and
+   reports the best result for the pure domain services (user agent parsing, screen size bucketing,
+   reporting period resolution) and for the whole ingestion use case wired to in-memory adapters.
+   No database or network is involved, so the numbers describe Symbanta's own code.
+2. *HTTP load tests*, two interchangeable drivers:
+   - [[https://k6.io][k6]] (~just bench-http~, ~just bench-query~): constant-arrival-rate ingestion and
+     dashboard read load, with thresholds. This is the canonical harness.
+   - ~bench/http_load.py~ (stdlib only, no install): ~python3 bench/http_load.py ingest
+     --concurrency 8 --duration 10~ and ~python3 bench/http_load.py query --username admin
+     --password ...~. Used for the numbers below on a machine without k6.
+
+Because ingestion is fire-and-forget, the HTTP benchmarks describe acceptance latency; the durable
+write throughput is visible in =events= table growth and in the JVM pipeline benchmark. Record the
+numbers of the machine you deploy on: absolute values are machine dependent, regressions between two
+revisions on the same machine are what matter.
+
+** Measured baseline
+
+Local run: 12 vCPU, Java 25, PostgreSQL 16 (Podman), API and load generator on the same machine.
+Treat these as a regression baseline, not as a capacity promise.
+
+| Benchmark                                          | Result                                                  |
+|----------------------------------------------------+---------------------------------------------------------|
+| =UserAgentParser.parse= (desktop UA)               | 767 ns/op (1.3M ops/s)                                  |
+| =ScreenSizeMapper.mapToBucket=                     | 8.5 ns/op (118M ops/s)                                  |
+| =ReportingPeriodResolver.resolve= (CUSTOM window)  | 447 ns/op (2.2M ops/s)                                  |
+| Ingestion use case, in-memory adapters             | 917 ns/event (1.09M events/s)                           |
+| =POST /v1/events/register=, 8 connections          | 3.6k req/s, p50 1.9 ms, p95 3.8 ms, p99 5.2 ms, 0 errors |
+| Dashboard queries, 8 connections, 7 endpoints      | 31 iterations/s, p95 419 ms                             |
+
+At ~3.6k accepted events/s the durable writer (~3k events/s on this machine) falls behind. The
+bounded ingestion queue (10,000 slots, 8 workers) then rejects the excess with a rate-limited
+warning while HTTP keeps answering =202= in a few milliseconds: no connection-pool collapse and no
+unbounded memory growth. An earlier unbounded variant of this dispatcher did collapse under the same
+load (JDBC pool exhausted, requests timing out), which is why the queue is bounded and configurable
+through =application.ingestion.queue-capacity= / =application.ingestion.worker-count=.
 
 ----------------
 

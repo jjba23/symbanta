@@ -54,6 +54,14 @@
   (fmt)
   (mvn "ktlint:check"))
 
+(define (bench)
+  "Run the JVM benchmarks (domain services and in-memory ingestion pipeline)."
+  ($ '("./mvnw -q -DskipTests compile exec:java -Dexec.mainClass=org.jointhefreeworld.symbanta.benchmark.BenchmarksKt -Dexec.classpathScope=runtime")))
+
+(define (bench-http)
+  "Run the dependency-free HTTP load generator against a running server."
+  ($ '("python3 bench/http_load.py ingest --concurrency 8 --duration 10")))
+
 (define (kill-server)
   "Kill any running HTTP server in the same port."
   ($ (list (~ "fuser -k ~a/tcp || true" http-port)))

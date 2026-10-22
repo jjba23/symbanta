@@ -64,6 +64,29 @@ test:
 check: lint test
 
 # ------------------------------------------------------------------------------
+# Benchmarks (issue #3)
+# ------------------------------------------------------------------------------
+
+# Run the JVM micro-benchmarks and ingestion pipeline benchmark (no database needed)
+bench:
+    ./mvnw -q -DskipTests compile exec:java -Dexec.mainClass=org.jointhefreeworld.symbanta.benchmark.BenchmarksKt -Dexec.classpathScope=runtime
+
+# Run the end-to-end ingestion load test (requires k6 and a running server)
+bench-http base="http://localhost:8080" rate="200" duration="30s":
+    BASE_URL={{base}} RATE={{rate}} DURATION={{duration}} k6 run bench/k6/ingestion-load.js
+
+# Run the dashboard query load test (requires k6, a running server and seeded credentials)
+bench-query base="http://localhost:8080" duration="30s":
+    BASE_URL={{base}} DURATION={{duration}} k6 run bench/k6/query-load.js
+
+# Dependency-free HTTP load generator (fallback when k6 is unavailable)
+bench-load-ingest base="http://localhost:8080" domain="localhost" concurrency="8" duration="10":
+    python3 bench/http_load.py ingest --base-url {{base}} --domain {{domain}} --concurrency {{concurrency}} --duration {{duration}}
+
+bench-load-query base="http://localhost:8080" domain="localhost" concurrency="8" duration="10":
+    python3 bench/http_load.py query --base-url {{base}} --domain {{domain}} --concurrency {{concurrency}} --duration {{duration}}
+
+# ------------------------------------------------------------------------------
 # Containers & Compose
 # ------------------------------------------------------------------------------
 

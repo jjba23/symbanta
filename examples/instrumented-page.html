@@ -23,12 +23,44 @@
     <meta charset="UTF-8">
     <title>Symbanta Telemetry Demo</title>
     <link href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css" rel="stylesheet">
-    <script data-endpoint="http://localhost:8080/v1/events/register" defer
+    <!--
+      data-track-clicks / data-track-hovers enable automatic interaction events,
+      data-capture-console forwards console.log / console.error to symbanta (#6).
+    -->
+    <script data-endpoint="http://localhost:8080/v1/events/register"
+            data-domain="localhost"
+            data-track-clicks
+            data-capture-console
+            defer
             src="http://localhost:8080/symbanta.js"></script>
 </head>
 <body>
 <h1>Συμβάντα <small><em>(symbanta)</em></small> Analytics Test Page</h1>
 <p>In this page we showcase how to instrument web applications and documents with <code>symbanta</code></p>
+
 <p>A <code>page-view</code> event has been transmitted to Symbanta.</p>
+
+<h2>Custom events (#4)</h2>
+<p>
+    Any event name is accepted, no schema migration needed. Declarative custom events send the
+    name in <code>data-symbanta-event</code> and optional metadata in <code>data-symbanta-props</code>:
+</p>
+<button data-symbanta-event="demo-signup-click" data-symbanta-props='{"plan":"pro"}'>
+    Send a custom "demo-signup-click" event
+</button>
+
+<p>Or call the API directly from JavaScript:</p>
+<pre><code>window.symbanta.track("checkout-started", {cartSize: 3, currency: "EUR"});</code></pre>
+<button onclick='window.symbanta.track("checkout-started", {cartSize: 3, currency: "EUR"})'>
+    Send "checkout-started"
+</button>
+
+<h2>Console capture (#6)</h2>
+<p>With <code>data-capture-console</code> the snippet mirrors browser console output into Symbanta:</p>
+<button onclick='console.log("demo log line"); console.error("demo error line")'>
+    Log two console messages
+</button>
+
+<p>Read them back with <code>GET /v1/logs?domain=localhost</code> (authenticated).</p>
 </body>
 </html>

@@ -388,6 +388,221 @@ paths:
               schema:
                 $ref: "#/components/schemas/V1ProblemDetails"
 
+  /v1/stats/events:
+    get:
+      summary: Get event type statistics
+      description: Retrieve occurrence counts per event name (page-view, click, signup, custom events).
+      operationId: getEventStats
+      parameters:
+        - name: domain
+          in: query
+          required: true
+          schema:
+            type: string
+          example: example.com
+          description: Registered domain name to fetch metrics for.
+        - name: period
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/Period"
+          description: Time range for metrics aggregation.
+        - name: start-date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Required if period is set to `CUSTOM` (YYYY-MM-DD).
+        - name: end-date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Required if period is set to `CUSTOM` (YYYY-MM-DD).
+      responses:
+        "200":
+          description: Event statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1EventStatsResponse"
+        "400":
+          description: Invalid period or parameters
+          content:
+            application/problem+detail:
+              schema:
+                $ref: "#/components/schemas/V1ProblemDetails"
+        "401":
+          description: Unauthorized dashboard access
+          content:
+            application/problem+detail:
+              schema:
+                $ref: "#/components/schemas/V1ProblemDetails"
+
+  /v1/stats/countries:
+    get:
+      summary: Get country breakdown statistics
+      description: Retrieve page views and visitors grouped by the coarse country of the client.
+      operationId: getCountryStats
+      parameters:
+        - name: domain
+          in: query
+          required: true
+          schema:
+            type: string
+          example: example.com
+          description: Registered domain name to fetch metrics for.
+        - name: period
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/Period"
+          description: Time range for metrics aggregation.
+        - name: start-date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Required if period is set to `CUSTOM` (YYYY-MM-DD).
+        - name: end-date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Required if period is set to `CUSTOM` (YYYY-MM-DD).
+      responses:
+        "200":
+          description: Country statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1CountryStatsResponse"
+        "400":
+          description: Invalid period or parameters
+          content:
+            application/problem+detail:
+              schema:
+                $ref: "#/components/schemas/V1ProblemDetails"
+        "401":
+          description: Unauthorized dashboard access
+          content:
+            application/problem+detail:
+              schema:
+                $ref: "#/components/schemas/V1ProblemDetails"
+
+  /v1/event-types:
+    get:
+      summary: List registered event types
+      description: Retrieve the event names registered for an application (domain).
+      operationId: getEventTypes
+      parameters:
+        - name: domain
+          in: query
+          required: true
+          schema:
+            type: string
+          example: example.com
+          description: Registered domain name whose event types are listed.
+      responses:
+        "200":
+          description: Event types retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1EventTypesResponse"
+        "401":
+          description: Unauthorized dashboard access
+          content:
+            application/problem+detail:
+              schema:
+                $ref: "#/components/schemas/V1ProblemDetails"
+
+    post:
+      summary: Register an event type
+      description: |
+        Declares an event name for an application before it is emitted. Registration is
+        idempotent: registering an existing name returns the existing definition.
+      operationId: registerEventType
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/V1EventTypeRegistrationRequest"
+      responses:
+        "201":
+          description: Event type registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1EventType"
+        "400":
+          description: Invalid event name or payload
+          content:
+            application/problem+detail:
+              schema:
+                $ref: "#/components/schemas/V1ProblemDetails"
+        "401":
+          description: Unauthorized dashboard access
+          content:
+            application/problem+detail:
+              schema:
+                $ref: "#/components/schemas/V1ProblemDetails"
+        "404":
+          description: Unknown property domain
+          content:
+            application/problem+detail:
+              schema:
+                $ref: "#/components/schemas/V1ProblemDetails"
+
+  /v1/logs:
+    get:
+      summary: Get recent console logs
+      description: |
+        Retrieve console output forwarded by instrumented applications (`console.log` and
+        `console.error` capture). Newest entries first.
+      operationId: getConsoleLogs
+      parameters:
+        - name: domain
+          in: query
+          required: true
+          schema:
+            type: string
+          example: example.com
+          description: Registered domain name to fetch logs for.
+        - name: level
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ConsoleLogLevel"
+          description: Only return entries of this level.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+          description: Maximum number of entries to return.
+      responses:
+        "200":
+          description: Console logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1ConsoleLogsResponse"
+        "401":
+          description: Unauthorized dashboard access
+          content:
+            application/problem+detail:
+              schema:
+                $ref: "#/components/schemas/V1ProblemDetails"
+
 components:
   schemas:
     Period:
@@ -747,6 +962,175 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/V1UserAgentStat"
+
+    ConsoleLogLevel:
+      type: string
+      description: Severity of a forwarded console message.
+      enum:
+        - log
+        - info
+        - warn
+        - error
+        - debug
+
+    V1EventStat:
+      type: object
+      required:
+        - eventName
+        - occurrences
+        - visitors
+      properties:
+        eventName:
+          type: string
+          example: "signup-click"
+          description: Registered event name.
+        occurrences:
+          type: integer
+          example: 1450
+          description: Total number of recorded occurrences.
+        visitors:
+          type: integer
+          example: 320
+          description: Distinct session visitors that emitted the event.
+
+    V1EventStatsResponse:
+      type: object
+      required:
+        - from
+        - to
+        - items
+      properties:
+        from:
+          type: string
+          format: date-time
+          description: Start timestamp for the aggregated metrics period (inclusive).
+        to:
+          type: string
+          format: date-time
+          description: End timestamp for the aggregated metrics period (inclusive).
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/V1EventStat"
+
+    V1CountryStat:
+      type: object
+      required:
+        - country
+        - pageViews
+        - visitors
+      properties:
+        country:
+          type: string
+          example: "NL"
+          description: ISO-3166 alpha-2 country code, or ZZ when unknown.
+        pageViews:
+          type: integer
+          example: 1450
+        visitors:
+          type: integer
+          example: 320
+
+    V1CountryStatsResponse:
+      type: object
+      required:
+        - from
+        - to
+        - items
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/V1CountryStat"
+
+    V1EventType:
+      type: object
+      required:
+        - id
+        - name
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "8b0b2f14-51c1-4e8f-9a1e-0f4b7f3a1c22"
+        name:
+          type: string
+          example: "signup-click"
+        description:
+          type: string
+          example: "User completed the signup form"
+        createdAt:
+          type: string
+          format: date-time
+
+    V1EventTypesResponse:
+      type: object
+      required:
+        - eventTypes
+      properties:
+        eventTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/V1EventType"
+
+    V1EventTypeRegistrationRequest:
+      type: object
+      required:
+        - domain
+        - name
+      properties:
+        domain:
+          type: string
+          example: example.com
+          description: Registered domain name owning the event type.
+        name:
+          type: string
+          example: signup-click
+          description: Event name (1-120 letters, digits or -_.:).
+        description:
+          type: string
+          example: User completed the signup form
+
+    V1ConsoleLogEntry:
+      type: object
+      required:
+        - timestamp
+        - level
+        - message
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        level:
+          $ref: "#/components/schemas/ConsoleLogLevel"
+        message:
+          type: string
+          example: "Failed to load /api/user: 500"
+        url:
+          type: string
+          format: uri
+        sessionId:
+          type: string
+        country:
+          type: string
+          example: "NL"
+
+    V1ConsoleLogsResponse:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/V1ConsoleLogEntry"
 
     V1ProblemDetails:
       type: object
