@@ -41,12 +41,22 @@ object TestDatabase {
         }
     }
 
+    val url: String get() = container.jdbcUrl
+
+    val username: String get() = container.username
+
+    val password: String get() = container.password
+
     val dataSource: DataSource by lazy {
+        val jdbcUrl = url
+        val user = username
+        val secret = password
+
         DriverManagerDataSource().apply {
             setDriverClassName("org.postgresql.Driver")
-            url = container.jdbcUrl
-            username = container.username
-            password = container.password
+            url = jdbcUrl
+            username = user
+            password = secret
         }
     }
 

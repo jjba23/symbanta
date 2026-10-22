@@ -40,6 +40,12 @@ interface AnalyticsQueryPort {
         range: DateRange,
     ): StatsSummary
 
+    /**
+     * Zero-filled buckets covering [range], at most
+     * [org.jointhefreeworld.symbanta.feature.statistics.domain.MAX_TIME_SERIES_POINTS] of them:
+     * longer windows are answered with their most recent buckets, starting at the first returned
+     * one rather than at `range.from`.
+     */
     fun timeSeries(
         domain: String,
         range: DateRange,

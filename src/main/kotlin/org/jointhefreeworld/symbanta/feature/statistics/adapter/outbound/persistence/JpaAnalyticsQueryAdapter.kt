@@ -25,6 +25,7 @@ import org.jointhefreeworld.symbanta.feature.events.domain.EventNames
 import org.jointhefreeworld.symbanta.feature.properties.port.outbound.PropertyRepositoryPort
 import org.jointhefreeworld.symbanta.feature.statistics.domain.CountryStat
 import org.jointhefreeworld.symbanta.feature.statistics.domain.EventStat
+import org.jointhefreeworld.symbanta.feature.statistics.domain.MAX_TIME_SERIES_POINTS
 import org.jointhefreeworld.symbanta.feature.statistics.domain.RouteStat
 import org.jointhefreeworld.symbanta.feature.statistics.domain.ScreenSizeStat
 import org.jointhefreeworld.symbanta.feature.statistics.domain.StatsSummary
@@ -90,7 +91,8 @@ open class JpaAnalyticsQueryAdapter(
     ): List<TimeSeriesPoint> {
         logger.debug { "Fetching time-series analytics stats from database" }
 
-        val buckets = bucketsOf(range, granularity)
+        val window = boundedWindow(range, granularity)
+        val buckets = bucketsOf(window, granularity)
         val property = properties.byDomain(domain)
 
         val counts =
@@ -100,8 +102,8 @@ open class JpaAnalyticsQueryAdapter(
                 events
                     .timeSeries(
                         property.id.value,
-                        range.from,
-                        range.to,
+                        window.from,
+                        window.to,
                         granularity.unit,
                         ReportingPeriodResolver.TIMEZONE,
                         EventNames.PAGE_VIEW,
@@ -189,6 +191,24 @@ open class JpaAnalyticsQueryAdapter(
     }
 
     /**
+     * Keeps a read proportional to what a chart can render: a window longer than
+     * [MAX_TIME_SERIES_POINTS] buckets is served as its most recent buckets, so `ALL_TIME` neither
+     * scans nor aggregates the entire history. Shorter windows are returned untouched.
+     */
+    private fun boundedWindow(
+        range: DateRange,
+        granularity: TimeGranularity,
+    ): DateRange {
+        var first = lastBucket(range, granularity)
+
+        repeat(MAX_TIME_SERIES_POINTS - 1) {
+            first = previousBucket(first, granularity)
+        }
+
+        return if (first.toInstant().isBefore(range.from)) range else DateRange(first.toInstant(), range.to)
+    }
+
+    /**
      * Start instants of every bucket that overlaps the window, in the reporting time zone.
      *
      * The window is half-open (`from` inclusive, `to` exclusive): a window that ends exactly on a
@@ -199,10 +219,8 @@ open class JpaAnalyticsQueryAdapter(
         range: DateRange,
         granularity: TimeGranularity,
     ): List<Instant> {
-        val zone = ReportingPeriodResolver.ZONE_ID
-        val first = bucketStart(range.from, zone, granularity)
-        val endBucket = bucketStart(range.to, zone, granularity)
-        val last = if (endBucket.toInstant() == range.to) previousBucket(endBucket, granularity) else endBucket
+        val first = bucketStart(range.from, ReportingPeriodResolver.ZONE_ID, granularity)
+        val last = lastBucket(range, granularity)
 
         if (last.isBefore(first)) return emptyList()
 
@@ -214,6 +232,15 @@ open class JpaAnalyticsQueryAdapter(
         }
 
         return buckets
+    }
+
+    /** The bucket containing `range.to`, or the one before it when the window ends exactly on a boundary. */
+    private fun lastBucket(
+        range: DateRange,
+        granularity: TimeGranularity,
+    ): ZonedDateTime {
+        val endBucket = bucketStart(range.to, ReportingPeriodResolver.ZONE_ID, granularity)
+        return if (endBucket.toInstant() == range.to) previousBucket(endBucket, granularity) else endBucket
     }
 
     private fun bucketStart(

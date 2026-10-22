@@ -113,7 +113,9 @@ Calculates privacy-safe metric aggregates (=pageViews=, =visitors=, =bounceRate=
 =GET /v1/stats/timeseries=
 Outputs time-bucketed (hourly or daily) metrics for graph rendering. Buckets are zero-filled and
 start at the local hour/day in =Europe/Amsterdam= (the reporting time zone), independent of the
-database session time zone; the requested window is half-open, so =to= is exclusive.
+database session time zone; the requested window is half-open, so =to= is exclusive. Long windows
+are bounded to their most recent 500 buckets, so =ALL_TIME= covers roughly the last sixteen months;
+=from= in the response is the first bucket actually returned.
 
 =GET /v1/stats/events=
 Occurrence counts and distinct visitors per event name, including custom and business events.

@@ -20,6 +20,7 @@ package org.jointhefreeworld.symbanta.feature.statistics.service
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.jointhefreeworld.symbanta.TestPrelude.amsterdamStartOfDayInstant
 import org.jointhefreeworld.symbanta.TestPrelude.fixedClock
@@ -142,6 +143,25 @@ class StatisticsQueryServiceSpec :
                 result.from shouldBe amsterdamStartOfDayInstant(2026, 1, 1)
                 result.to shouldBe amsterdamStartOfDayInstant(2026, 1, 3)
                 verify(queries).timeSeries(eq("example.com"), any(), eq(TimeGranularity.HOUR))
+            }
+
+            test("reports the first returned bucket as the window start") {
+                val firstBucket = amsterdamStartOfDayInstant(2025, 9, 28)
+                whenever(queries.timeSeries(any(), any(), any())).thenReturn(
+                    listOf(
+                        TimeSeriesPoint(firstBucket, pageViews = 1, visitors = 1),
+                        TimeSeriesPoint(amsterdamStartOfDayInstant(2025, 9, 29), pageViews = 0, visitors = 0),
+                    ),
+                )
+
+                val result =
+                    service.timeSeries(
+                        StatsQuery("example.com", PeriodSelection(TimePeriod.ALL_TIME)),
+                    )
+
+                result.from shouldBe firstBucket
+                result.to shouldBe fixedClock.instant()
+                result.points shouldHaveSize 2
             }
 
             test("uses daily buckets for a custom window longer than 48 hours") {

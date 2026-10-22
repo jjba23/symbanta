@@ -42,6 +42,16 @@ data class TimeSeriesPoint(
     val visitors: Long,
 )
 
+/**
+ * Upper bound on the number of buckets a time series may return (500 daily buckets, roughly
+ * sixteen months).
+ *
+ * Windows longer than this — `ALL_TIME` starts at the epoch — are served as their most recent
+ * buckets: a chart cannot use more points, and aggregating every event ever recorded would make
+ * the query cost grow with the lifetime of the deployment.
+ */
+const val MAX_TIME_SERIES_POINTS = 500
+
 /** Raw (width, height) bucket as stored in the database. */
 data class ScreenSizeStat(
     val width: Int,

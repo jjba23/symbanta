@@ -67,12 +67,15 @@ class StatisticsQueryService(
     override fun timeSeries(query: StatsQuery): TimeSeriesResult {
         val range = resolve(query)
         val granularity = ReportingPeriodResolver.granularity(query.period.period, range)
+        val points = queries.timeSeries(query.domain, range, granularity)
 
         return TimeSeriesResult(
             granularity = granularity,
-            from = range.from,
+            // The adapter bounds very long windows (ALL_TIME) to their most recent buckets, so the
+            // reported window start is the first bucket actually returned.
+            from = points.firstOrNull()?.timestamp ?: range.from,
             to = range.to,
-            points = queries.timeSeries(query.domain, range, granularity),
+            points = points,
         )
     }
 

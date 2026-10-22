@@ -36,7 +36,6 @@ import org.jointhefreeworld.symbanta.feature.statistics.adapter.outbound.persist
 import org.jointhefreeworld.symbanta.feature.statistics.port.outbound.AnalyticsQueryPort
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Configuration
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 import org.springframework.orm.jpa.JpaTransactionManager
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean
@@ -78,7 +77,14 @@ object TestPersistence {
     val consoleLogs: ConsoleLogQueryPort get() = context.getBean(ConsoleLogQueryPort::class.java)
 }
 
-@Configuration
+/**
+ * Deliberately not annotated with `@Configuration`.
+ *
+ * It lives inside the application's component-scan package, so a stereotype would also be picked
+ * up whenever a spec boots the real application (`ApplicationContextSpec`) and collide with the
+ * production beans of the same name. [TestPersistence] registers it explicitly instead; Spring
+ * still processes its `@Bean` methods as a lite configuration class.
+ */
 @EnableJpaRepositories(basePackages = ["org.jointhefreeworld.symbanta.feature"])
 @EnableTransactionManagement
 class TestPersistenceConfig {

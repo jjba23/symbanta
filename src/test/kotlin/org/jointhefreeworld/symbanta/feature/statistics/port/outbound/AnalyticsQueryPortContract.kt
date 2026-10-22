@@ -26,13 +26,16 @@ import io.kotest.matchers.shouldBe
 import org.jointhefreeworld.symbanta.TestPrelude.amsterdamStartOfDayInstant
 import org.jointhefreeworld.symbanta.feature.events.domain.EventNames
 import org.jointhefreeworld.symbanta.feature.properties.domain.Property
+import org.jointhefreeworld.symbanta.feature.statistics.domain.MAX_TIME_SERIES_POINTS
 import org.jointhefreeworld.symbanta.feature.statistics.domain.TimeGranularity
+import org.jointhefreeworld.symbanta.shared.domain.ReportingPeriodResolver
 import org.jointhefreeworld.symbanta.support.AnalyticsFixtures.BASE_TIME
 import org.jointhefreeworld.symbanta.support.AnalyticsFixtures.event
 import org.jointhefreeworld.symbanta.support.AnalyticsFixtures.range
 import org.jointhefreeworld.symbanta.support.AnalyticsQueryFixture
 import java.math.BigDecimal
 import java.time.Instant
+import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 /**
@@ -183,6 +186,28 @@ abstract class AnalyticsQueryPortContract(
                 points shouldHaveSize 2
                 points.map { it.pageViews } shouldContainExactly listOf(0L, 0L)
                 points.map { it.visitors } shouldContainExactly listOf(0L, 0L)
+            }
+
+            test("bounds long windows to the most recent buckets") {
+                fixture.write(listOf(event(property, createdAt = BASE_TIME)))
+
+                val points =
+                    queries.timeSeries(
+                        property.domain,
+                        range(from = Instant.EPOCH, to = BASE_TIME.plusSeconds(60)),
+                        TimeGranularity.DAY,
+                    )
+
+                points shouldHaveSize MAX_TIME_SERIES_POINTS
+                points.last().timestamp shouldBe amsterdamStartOfDayInstant(2026, 1, 10)
+                points.first().timestamp shouldBe
+                    LocalDate
+                        .of(2026, 1, 10)
+                        .minusDays(MAX_TIME_SERIES_POINTS - 1L)
+                        .atStartOfDay(ReportingPeriodResolver.ZONE_ID)
+                        .toInstant()
+                points.last().pageViews shouldBe 1
+                points.dropLast(1).sumOf { it.pageViews } shouldBe 0
             }
 
             test("excludes events outside the half-open window") {
