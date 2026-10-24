@@ -162,18 +162,28 @@ class BatchingEventDispatcher(
         batchSize.record(batch.size.toDouble())
         val sample = Timer.start()
 
+        var written = 0
+        var failure: Exception? = null
         try {
-            val written = persistence.persist(batch)
+            written = persistence.persist(batch)
+        } catch (error: Exception) {
+            failure = error
+        } finally {
+            // Release the backlog *before* publishing the batch outcome below: an observer that
+            // sees a batch counted as processed/failed must also see its events leave the backlog.
+            backlog.addAndGet(-batch.size.toLong())
+            sample.stop(flushTimer)
+        }
+
+        val failedWrite = failure
+        if (failedWrite != null) {
+            failed.increment(batch.size.toDouble())
+            logger.error(failedWrite) { "Failed to persist a batch of ${batch.size} event(s)" }
+        } else {
             processed.increment(written.toDouble())
             if (written < batch.size) {
                 logger.debug { "Wrote $written of ${batch.size} batch event(s); the rest had no registered property" }
             }
-        } catch (error: Exception) {
-            failed.increment(batch.size.toDouble())
-            logger.error(error) { "Failed to persist a batch of ${batch.size} event(s)" }
-        } finally {
-            backlog.addAndGet(-batch.size.toLong())
-            sample.stop(flushTimer)
         }
     }
 
