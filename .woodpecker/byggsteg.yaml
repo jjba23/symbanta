@@ -57,7 +57,9 @@ steps:
                   (branch-name . "%%CI_COMMIT_BRANCH%%")
                   (clone-url . "%%CI_REPO_CLONE_URL%%")
                   (trivial-cmds . ,(list (string-append
-                                          "cd %%CI_REPO_CLONE_URL%% && "
+                                          "cd /etc/byggsteg/job-clone/"
+                                          "%%CI_REPO_NAME%%/%%CI_COMMIT_BRANCH%%"
+                                          " && "
                                           "nix --extra-experimental-features "
                                           "'nix-command flakes' develop -c"
                                           " -- "
