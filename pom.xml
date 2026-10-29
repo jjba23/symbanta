@@ -31,7 +31,7 @@
         <kotlin-logging.version>8.0.4</kotlin-logging.version>
         <spring-boot-starter-opentelemetry.version>4.1.0</spring-boot-starter-opentelemetry.version>
         <opentelemetry-instrumentation.version>2.29.0</opentelemetry-instrumentation.version>
-        <opentelemetry-api.version>1.64.0</opentelemetry-api.version>
+        <opentelemetry-api.version>1.67.0</opentelemetry-api.version>
         <opentelemetry-micrometer.version>2.27.0-alpha</opentelemetry-micrometer.version>
         <kotest.version>6.2.3</kotest.version>
         <testcontainers.version>1.19.8</testcontainers.version>
