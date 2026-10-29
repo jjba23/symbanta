@@ -53,12 +53,13 @@ server:
   error:
     include-stacktrace: always
 
+# Request-level framework logging stays at INFO: the web and security packages log several
+# lines per request at DEBUG, which costs measurable CPU on the ingestion hot path and floods
+# the JSON log. Raise them per environment (LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=DEBUG) when
+# debugging instead of shipping DEBUG to every deployment.
 logging:
   level:
-    org:
-      springframework:
-        web: DEBUG
-        security: DEBUG
+    root: INFO
 
 
 application:
@@ -68,6 +69,13 @@ application:
     worker-count: 8
     # Events coalesced into one batched INSERT
     max-batch-size: 500
+    # Grace period a worker gives each batch to fill before flushing it, so a few thousand
+    # events per second are not written as one transaction per event.
+    linger-millis: 10
+  # Dashboard reads are full-window aggregates, so a repeated read inside this window is served
+  # from memory. Set to 0 to disable the cache and read the store on every call.
+  stats:
+    cache-ttl: 15s
   user-seeder:
     users: []
       # - username: admin

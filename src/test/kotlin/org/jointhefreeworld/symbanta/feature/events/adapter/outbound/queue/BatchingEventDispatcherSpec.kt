@@ -56,6 +56,42 @@ class BatchingEventDispatcherSpec :
         fun backlog(): Double = registry.get(BatchingEventDispatcher.METRIC_BACKLOG).gauge().value()
 
         context("coalescing") {
+            test("holds the batch open for the linger window so late arrivals join it") {
+                val batches = CopyOnWriteArrayList<List<PendingEvent>>()
+
+                val dispatcher =
+                    BatchingEventDispatcher(
+                        persistence =
+                            object : EventPersistenceUseCase {
+                                override fun persist(events: List<PendingEvent>): Int {
+                                    batches += events
+                                    return events.size
+                                }
+                            },
+                        meterRegistry = registry,
+                        queueCapacity = 100,
+                        workerCount = 1,
+                        maxBatchSize = 100,
+                        lingerMillis = 500,
+                    )
+
+                try {
+                    dispatcher.enqueue(pending(0))
+                    await { backlog() == 1.0 }
+                    // The worker is inside its linger window, holding the batch open; these
+                    // events arrive after the first one and must still land in the same write.
+                    Thread.sleep(50)
+                    repeat(9) { dispatcher.enqueue(pending(it + 1)) }
+
+                    await { counter(BatchingEventDispatcher.METRIC_PROCESSED) == 10.0 }
+
+                    batches.map { it.size } shouldContainExactly listOf(10)
+                    registry.get(BatchingEventDispatcher.METRIC_FLUSH).timer().count() shouldBe 1L
+                } finally {
+                    dispatcher.shutdown()
+                }
+            }
+
             test("drains a backlog into one batched write per worker pass") {
                 val started = CountDownLatch(1)
                 val release = CountDownLatch(1)

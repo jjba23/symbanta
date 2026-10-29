@@ -39,15 +39,48 @@ interface EventJpaRepository : JpaRepository<EventEntity, UUID> {
         pageable: Pageable,
     ): List<EventEntity>
 
+    /**
+     * Page views, visitors, bounce rate and average active duration in one pass.
+     *
+     * The dashboard used to ask for the counts and the session behaviour separately, which read
+     * the same window twice: a page view count, then a window function pass to pair each event
+     * with the previous one in its session. Both now come from a single scan: the sessions CTE
+     * pairs the events once (`LAG`), and everything else is an aggregate over its rows. Page views
+     * and visitors keep the half-open `[from, to)` bound; the gap that measures active time also
+     * admits an event exactly at `to`, as before, so a session's last interval is not lost.
+     */
     @Query(
-        """
-        select sum(case when e.name = :pageView then 1 else 0 end) as pageViews,
-               count(distinct e.sessionId) as visitors
-        from EventEntity e
-        where e.propertyId = :propertyId
-          and e.createdAt >= :from and e.createdAt < :to
-          and e.sessionId is not null
+        value = """
+        WITH session_events AS (
+            SELECT e.session_id,
+                   e.event_name,
+                   e.created_at,
+                   EXTRACT(EPOCH FROM (e.created_at - LAG(e.created_at) OVER (PARTITION BY e.session_id ORDER BY e.created_at))) AS gap_sec
+            FROM events e
+            WHERE e.property_id = :propertyId
+              AND e.created_at >= :from AND e.created_at <= :to
+              AND e.session_id IS NOT NULL
+        ),
+        sessions AS (
+            SELECT session_id,
+                   COUNT(*) FILTER (WHERE event_name = :pageView AND created_at < :to) AS pv_count,
+                   SUM(CASE WHEN gap_sec <= 30 THEN gap_sec * 1000 ELSE 0 END) FILTER (WHERE gap_sec IS NOT NULL) AS active_ms
+            FROM session_events
+            GROUP BY session_id
+            HAVING COUNT(*) FILTER (WHERE created_at < :to) > 0
+        )
+        SELECT
+            COALESCE(SUM(s.pv_count), 0) AS "pageViews",
+            COUNT(s.session_id) AS "visitors",
+            COALESCE(
+                (COUNT(*) FILTER (WHERE s.pv_count = 1 AND COALESCE(s.active_ms, 0) < 10000)::numeric /
+                 NULLIF(COUNT(s.session_id), 0)) * 100,
+                0.00
+            )::numeric AS "bounceRate",
+            COALESCE(AVG(s.active_ms), 0.0)::double precision AS "avgDurationMs"
+        FROM sessions s
         """,
+        nativeQuery = true,
     )
     fun sessionSummary(
         @Param("propertyId") propertyId: UUID,
@@ -55,51 +88,6 @@ interface EventJpaRepository : JpaRepository<EventEntity, UUID> {
         @Param("to") to: Instant,
         @Param("pageView") pageView: String,
     ): SessionSummaryRow
-
-    @Query(
-        value = """
-        WITH session_metrics AS (
-            SELECT e.session_id,
-                   COUNT(*) FILTER (WHERE e.event_name = :pageView) AS pv_count
-            FROM events e
-            WHERE e.property_id = :propertyId
-              AND e.created_at >= :from AND e.created_at < :to
-              AND e.session_id IS NOT NULL
-            GROUP BY e.session_id
-        ),
-        event_deltas AS (
-            SELECT e.session_id,
-                   EXTRACT(EPOCH FROM (e.created_at - LAG(e.created_at) OVER (PARTITION BY e.session_id ORDER BY e.created_at))) AS gap_sec
-            FROM events e
-            WHERE e.property_id = :propertyId
-              AND e.created_at >= :from AND e.created_at <= :to
-              AND e.session_id IS NOT NULL
-        ),
-        active_durations AS (
-            SELECT session_id,
-                   SUM(CASE WHEN gap_sec <= 30 THEN gap_sec * 1000 ELSE 0 END) AS active_ms
-            FROM event_deltas
-            WHERE gap_sec IS NOT NULL
-            GROUP BY session_id
-        )
-        SELECT
-            COALESCE(
-                (COUNT(*) FILTER (WHERE sm.pv_count = 1 AND COALESCE(ad.active_ms, 0) < 10000)::numeric /
-                 NULLIF(COUNT(sm.session_id), 0)) * 100,
-                0.00
-            )::numeric AS bounce_rate,
-            COALESCE(AVG(ad.active_ms), 0.0)::double precision AS avg_duration_ms
-        FROM session_metrics sm
-        LEFT JOIN active_durations ad ON sm.session_id = ad.session_id
-        """,
-        nativeQuery = true,
-    )
-    fun sessionBehaviour(
-        @Param("propertyId") propertyId: UUID,
-        @Param("from") from: Instant,
-        @Param("to") to: Instant,
-        @Param("pageView") pageView: String,
-    ): SessionBehaviourRow
 
     /**
      * Buckets by local wall-clock hour/day in `zone`: truncating a `timestamptz` directly would
@@ -229,9 +217,6 @@ interface EventJpaRepository : JpaRepository<EventEntity, UUID> {
 interface SessionSummaryRow {
     val pageViews: Long?
     val visitors: Long
-}
-
-interface SessionBehaviourRow {
     val bounceRate: BigDecimal
     val avgDurationMs: Double
 }

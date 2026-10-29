@@ -36,6 +36,7 @@ import org.jointhefreeworld.symbanta.feature.properties.port.outbound.PropertyRe
 import org.jointhefreeworld.symbanta.feature.properties.service.PropertyService
 import org.jointhefreeworld.symbanta.feature.statistics.adapter.outbound.persistence.JpaAnalyticsQueryAdapter
 import org.jointhefreeworld.symbanta.feature.statistics.port.outbound.AnalyticsQueryPort
+import org.jointhefreeworld.symbanta.feature.statistics.service.CachingStatisticsQueryService
 import org.jointhefreeworld.symbanta.feature.statistics.service.StatisticsQueryService
 import org.jointhefreeworld.symbanta.shared.adapter.outbound.time.SystemClockAdapter
 import org.jointhefreeworld.symbanta.shared.port.outbound.ClockPort
@@ -106,6 +107,7 @@ class WiringConfig {
             queueCapacity = ingestion.queueCapacity,
             workerCount = ingestion.workerCount,
             maxBatchSize = ingestion.maxBatchSize,
+            lingerMillis = ingestion.lingerMillis,
         )
 
     @Bean
@@ -120,7 +122,15 @@ class WiringConfig {
     fun statisticsQueryService(
         queries: AnalyticsQueryPort,
         clock: ClockPort,
-    ): StatisticsQueryService = StatisticsQueryService(queries, clock)
+        cache: StatisticsCacheConfig,
+        meterRegistry: MeterRegistry,
+    ): CachingStatisticsQueryService =
+        CachingStatisticsQueryService(
+            delegate = StatisticsQueryService(queries, clock),
+            config = cache,
+            clock = clock,
+            meterRegistry = meterRegistry,
+        )
 
     @Bean
     fun propertyService(properties: PropertyRepositoryPort): PropertyService = PropertyService(properties)

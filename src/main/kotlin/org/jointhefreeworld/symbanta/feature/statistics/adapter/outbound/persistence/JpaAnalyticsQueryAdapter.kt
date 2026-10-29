@@ -60,14 +60,14 @@ open class JpaAnalyticsQueryAdapter(
             logger.debug { "Fetching analytics stats summary from database" }
 
             val property = properties.byDomain(domain) ?: return@withLoggingContext EMPTY_SUMMARY
+            // Counts and session behaviour come from one pass; see the query's own comment.
             val counts = events.sessionSummary(property.id.value, range.from, range.to, EventNames.PAGE_VIEW)
-            val behaviour = events.sessionBehaviour(property.id.value, range.from, range.to, EventNames.PAGE_VIEW)
 
             StatsSummary(
                 pageViews = counts?.pageViews ?: 0,
                 visitors = counts?.visitors ?: 0,
-                bounceRate = behaviour?.bounceRate ?: BigDecimal.ZERO,
-                averageDurationMillis = BigDecimal.valueOf(behaviour?.avgDurationMs ?: 0.0),
+                bounceRate = counts?.bounceRate ?: BigDecimal.ZERO,
+                averageDurationMillis = BigDecimal.valueOf(counts?.avgDurationMs ?: 0.0),
             )
         }
 

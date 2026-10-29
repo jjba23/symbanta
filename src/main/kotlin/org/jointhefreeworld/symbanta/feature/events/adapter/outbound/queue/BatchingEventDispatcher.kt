@@ -36,8 +36,11 @@ import java.util.concurrent.atomic.AtomicLong
  *
  * - a bounded [Channel] that absorbs short bursts,
  * - a fixed pool of worker coroutines that is the only component touching the database,
- * - coalescing: a worker drains up to [maxBatchSize] queued events and writes them with a single
- *   batched statement, so throughput is bound by batches rather than by events,
+ * - coalescing: a worker drains up to [maxBatchSize] queued events, waiting at most
+ *   [lingerMillis] for more of them, and writes them with a single batched statement. Without the
+ *   wait a worker flushes whatever happens to be queued, and at a few thousand events per second
+ *   that is one event per transaction: the commit, not the row, is the cost (measured, see
+ *   README),
  * - a drop-with-warning policy once the queue is full: the API keeps answering 202 and the
  *   dropped count is logged (rate limited) instead of growing the heap without bound.
  *
@@ -50,6 +53,7 @@ class BatchingEventDispatcher(
     queueCapacity: Int = DEFAULT_QUEUE_CAPACITY,
     workerCount: Int = DEFAULT_WORKER_COUNT,
     private val maxBatchSize: Int = DEFAULT_MAX_BATCH_SIZE,
+    private val lingerMillis: Long = DEFAULT_LINGER_MILLIS,
 ) : EventQueuePort {
     private val queueCapacity: Int = queueCapacity
     private val logger = KotlinLogging.logger {}
@@ -102,6 +106,7 @@ class BatchingEventDispatcher(
         require(queueCapacity > 0) { "queueCapacity must be positive" }
         require(workerCount > 0) { "workerCount must be positive" }
         require(maxBatchSize > 0) { "maxBatchSize must be positive" }
+        require(lingerMillis >= 0) { "lingerMillis must not be negative" }
 
         Gauge
             .builder(METRIC_BACKLOG, backlog) { it.get().toDouble() }
@@ -137,12 +142,33 @@ class BatchingEventDispatcher(
             val batch = ArrayList<PendingEvent>(maxBatchSize)
             batch.add(first)
 
+            drainInto(batch)
+            flush(batch)
+        }
+    }
+
+    /**
+     * Fills [batch] up to [maxBatchSize], waiting at most [lingerMillis] for the next event.
+     *
+     * A worker that only takes what is already queued writes one row per transaction whenever
+     * arrivals are slower than flushes, which is exactly the regime of a busy but healthy site.
+     * Waiting briefly lets the batch fill and turns those commits into a few rows each; under a
+     * real burst the wait is spent draining the queue, so nothing is added to the flush schedule.
+     */
+    private suspend fun drainInto(batch: MutableList<PendingEvent>) {
+        if (lingerMillis <= 0) {
             while (batch.size < maxBatchSize) {
                 val next = queue.tryReceive().getOrNull() ?: break
                 batch.add(next)
             }
+            return
+        }
 
-            flush(batch)
+        withTimeoutOrNull(lingerMillis) {
+            while (batch.size < maxBatchSize) {
+                val next = queue.receiveCatching().getOrNull() ?: return@withTimeoutOrNull
+                batch.add(next)
+            }
         }
     }
 
@@ -188,6 +214,9 @@ class BatchingEventDispatcher(
         const val DEFAULT_QUEUE_CAPACITY = 10_000
         const val DEFAULT_WORKER_COUNT = 8
         const val DEFAULT_MAX_BATCH_SIZE = 500
+
+        /** How long a worker waits for its batch to fill before writing it. */
+        const val DEFAULT_LINGER_MILLIS = 10L
 
         const val METRIC_ENQUEUED = "symbanta.ingestion.events.enqueued"
         const val METRIC_PROCESSED = "symbanta.ingestion.events.processed"
