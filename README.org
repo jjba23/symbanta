@@ -3,7 +3,7 @@
 #+email: jjbigorra@gmail.com
 #+language: en
 
-[[https://jointhefreeworld.org/ggg/dist/license-agpl3+.svg]]    [[https://jointhefreeworld.org/ggg/dist/license-fdl13+.svg]]
+[[https://jointhefreeworld.org/ggg/dist/license-mit.svg]] [[https://img.shields.io/badge/CI-Byggsteg%20%7C%20GitHub-2ea44f.svg]]
 
 Symbanta  is a  privacy-friendly, free and open-source software analytics platform.
 
@@ -389,13 +389,9 @@ The analytics outbound ports have reusable contract suites:
 
 * Licensing
 
-This project and all of its source code are free software, licensed under the GNU Affero General Public License v3 (or newer at your convenience).
+This project, and Git repository, and all of its source code are free and open software, licensed under the [[https://opensource.org/license/mit][MIT License]]. The full text is in the =LICENSE= file, and every source file says the same in its own header, as an =SPDX-License-Identifier: MIT= line.
 
-https://www.gnu.org/licenses/agpl-3.0.html
-
-The documentation and examples, including this document, which are provided are all licensed under the GNU Free Documentation License v1.3 (or newer at your convenience).
-
-https://www.gnu.org/licenses/fdl-1.3.html
+The documentation and examples, including this document, which are provided are all licensed under the same [[https://opensource.org/license/mit][MIT License]].
 
 -------
 
@@ -407,7 +403,7 @@ Our core principle is simple: *AI should assist human creativity and problem-sol
 
 While tools like Large Language Models (LLMs) and interactive chatbots can be beneficial for reviewing, refactoring small functions, or acting as a sounding board, they should be used with moderation.
 
-We require a human in the loop for all contributions. The use of autonomous AI agents to automatically generate and submit pull requests to this project is strictly prohibited.
+We require a human in the loop for all contributions.
 
 
 -----------------------

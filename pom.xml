@@ -13,6 +13,13 @@
     <version>0.0.1-SNAPSHOT</version>
     <name>symbanta</name>
     <description>Privacy-friendly, free, and open-source software analytics platform API.</description>
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/license/mit</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
     <properties>
         <java.version>25</java.version>
         <kotlin.version>2.4.10</kotlin.version>
