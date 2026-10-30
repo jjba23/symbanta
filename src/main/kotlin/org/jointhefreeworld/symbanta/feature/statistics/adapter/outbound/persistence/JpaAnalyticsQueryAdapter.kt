@@ -60,10 +60,10 @@ open class JpaAnalyticsQueryAdapter(
             val counts = events.sessionSummary(property.id.value, range.from, range.to, EventNames.PAGE_VIEW)
 
             StatsSummary(
-                pageViews = counts?.pageViews ?: 0,
-                visitors = counts?.visitors ?: 0,
-                bounceRate = counts?.bounceRate ?: BigDecimal.ZERO,
-                averageDurationMillis = BigDecimal.valueOf(counts?.avgDurationMs ?: 0.0),
+                pageViews = counts.pageViews ?: 0,
+                visitors = counts.visitors,
+                bounceRate = counts.bounceRate,
+                averageDurationMillis = BigDecimal.valueOf(counts.avgDurationMs),
             )
         }
 

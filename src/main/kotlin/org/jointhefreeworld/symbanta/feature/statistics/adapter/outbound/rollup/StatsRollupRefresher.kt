@@ -55,7 +55,7 @@ class StatsRollupRefresher(
      * hour is represented as of this run, which is why the watermark is a plain instant and not an
      * hour boundary.
      */
-    fun refresh(): Instant = transactions.execute { refreshInTransaction() }!!
+    fun refresh(): Instant = transactions.execute { refreshInTransaction() }
 
     private fun refreshInTransaction(): Instant {
         val startedAt = clock.now()

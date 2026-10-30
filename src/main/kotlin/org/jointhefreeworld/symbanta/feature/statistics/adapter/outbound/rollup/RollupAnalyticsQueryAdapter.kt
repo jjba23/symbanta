@@ -77,7 +77,7 @@ open class RollupAnalyticsQueryAdapter(
                     )
                 }
             },
-        ) ?: EMPTY_SUMMARY
+        )
     }
 
     @Transactional(readOnly = true)
