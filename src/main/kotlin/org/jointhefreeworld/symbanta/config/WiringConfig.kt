@@ -35,6 +35,8 @@ import org.jointhefreeworld.symbanta.feature.properties.adapter.outbound.persist
 import org.jointhefreeworld.symbanta.feature.properties.port.outbound.PropertyRepositoryPort
 import org.jointhefreeworld.symbanta.feature.properties.service.PropertyService
 import org.jointhefreeworld.symbanta.feature.statistics.adapter.outbound.persistence.JpaAnalyticsQueryAdapter
+import org.jointhefreeworld.symbanta.feature.statistics.adapter.outbound.rollup.RollupAnalyticsQueryAdapter
+import org.jointhefreeworld.symbanta.feature.statistics.adapter.outbound.rollup.StatsRollupRefresher
 import org.jointhefreeworld.symbanta.feature.statistics.port.outbound.AnalyticsQueryPort
 import org.jointhefreeworld.symbanta.feature.statistics.service.CachingStatisticsQueryService
 import org.jointhefreeworld.symbanta.feature.statistics.service.StatisticsQueryService
@@ -42,8 +44,10 @@ import org.jointhefreeworld.symbanta.shared.adapter.outbound.time.SystemClockAda
 import org.jointhefreeworld.symbanta.shared.port.outbound.ClockPort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.security.crypto.password.PasswordEncoder
+import org.springframework.transaction.PlatformTransactionManager
 
 /**
  * The composition root.
@@ -68,11 +72,30 @@ class WiringConfig {
     @Bean
     fun eventStorePort(repository: EventJpaRepository): EventStorePort = JpaEventStore(repository)
 
+    /**
+     * Dashboard reads are answered from the pre-aggregated tables; disabling
+     * `application.stats.rollup` switches back to aggregating the event log per request.
+     */
     @Bean
     fun analyticsQueryPort(
         properties: PropertyRepositoryPort,
         repository: EventJpaRepository,
-    ): AnalyticsQueryPort = JpaAnalyticsQueryAdapter(properties, repository)
+        jdbc: NamedParameterJdbcTemplate,
+        refresher: StatsRollupRefresher,
+        config: StatisticsRollupConfig,
+    ): AnalyticsQueryPort =
+        if (config.enabled) {
+            RollupAnalyticsQueryAdapter(jdbc, properties, refresher)
+        } else {
+            JpaAnalyticsQueryAdapter(properties, repository)
+        }
+
+    @Bean
+    fun statsRollupRefresher(
+        jdbc: NamedParameterJdbcTemplate,
+        clock: ClockPort,
+        transactions: PlatformTransactionManager,
+    ): StatsRollupRefresher = StatsRollupRefresher(jdbc, clock, transactions)
 
     @Bean
     fun consoleLogQueryPort(repository: EventJpaRepository): ConsoleLogQueryPort = JpaConsoleLogAdapter(repository)

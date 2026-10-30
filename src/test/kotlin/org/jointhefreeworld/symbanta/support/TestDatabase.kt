@@ -63,7 +63,8 @@ object TestDatabase {
 
     fun truncate() {
         jdbcTemplate.jdbcTemplate.execute(
-            "TRUNCATE TABLE events, event_types, properties, app_users RESTART IDENTITY CASCADE;",
+            "TRUNCATE TABLE events, event_types, properties, app_users, " +
+                "stats_session_bucket, stats_dimension_bucket, stats_rollup_state RESTART IDENTITY CASCADE;",
         )
     }
 }

@@ -13,10 +13,10 @@ import org.jointhefreeworld.symbanta.feature.events.domain.EventNames
 import org.jointhefreeworld.symbanta.feature.properties.port.outbound.PropertyRepositoryPort
 import org.jointhefreeworld.symbanta.feature.statistics.domain.CountryStat
 import org.jointhefreeworld.symbanta.feature.statistics.domain.EventStat
-import org.jointhefreeworld.symbanta.feature.statistics.domain.MAX_TIME_SERIES_POINTS
 import org.jointhefreeworld.symbanta.feature.statistics.domain.RouteStat
 import org.jointhefreeworld.symbanta.feature.statistics.domain.ScreenSizeStat
 import org.jointhefreeworld.symbanta.feature.statistics.domain.StatsSummary
+import org.jointhefreeworld.symbanta.feature.statistics.domain.TimeBuckets
 import org.jointhefreeworld.symbanta.feature.statistics.domain.TimeGranularity
 import org.jointhefreeworld.symbanta.feature.statistics.domain.TimeSeriesPoint
 import org.jointhefreeworld.symbanta.feature.statistics.domain.UserAgentStat
@@ -25,10 +25,6 @@ import org.jointhefreeworld.symbanta.shared.domain.DateRange
 import org.jointhefreeworld.symbanta.shared.domain.ReportingPeriodResolver
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
-import java.time.Instant
-import java.time.ZoneId
-import java.time.ZonedDateTime
-import java.time.temporal.ChronoUnit
 
 /**
  * Analytics read port implemented on top of Spring Data JPA.
@@ -79,8 +75,8 @@ open class JpaAnalyticsQueryAdapter(
     ): List<TimeSeriesPoint> {
         logger.debug { "Fetching time-series analytics stats from database" }
 
-        val window = boundedWindow(range, granularity)
-        val buckets = bucketsOf(window, granularity)
+        val window = TimeBuckets.bounded(range, ReportingPeriodResolver.ZONE_ID, granularity)
+        val buckets = TimeBuckets.of(window, ReportingPeriodResolver.ZONE_ID, granularity)
         val property = properties.byDomain(domain)
 
         val counts =
@@ -177,89 +173,6 @@ open class JpaAnalyticsQueryAdapter(
             .countries(property.id.value, range.from, range.to, EventNames.PAGE_VIEW)
             .map { CountryStat(country = it.country, pageViews = it.pageViews ?: 0, visitors = it.visitors) }
     }
-
-    /**
-     * Keeps a read proportional to what a chart can render: a window longer than
-     * [MAX_TIME_SERIES_POINTS] buckets is served as its most recent buckets, so `ALL_TIME` neither
-     * scans nor aggregates the entire history. Shorter windows are returned untouched.
-     */
-    private fun boundedWindow(
-        range: DateRange,
-        granularity: TimeGranularity,
-    ): DateRange {
-        var first = lastBucket(range, granularity)
-
-        repeat(MAX_TIME_SERIES_POINTS - 1) {
-            first = previousBucket(first, granularity)
-        }
-
-        return if (first.toInstant().isBefore(range.from)) range else DateRange(first.toInstant(), range.to)
-    }
-
-    /**
-     * Start instants of every bucket that overlaps the window, in the reporting time zone.
-     *
-     * The window is half-open (`from` inclusive, `to` exclusive): a window that ends exactly on a
-     * bucket boundary does not grow a permanently empty trailing point, while a window that ends
-     * mid-bucket (`TODAY` ends at "now") still includes the bucket the current time falls in.
-     */
-    private fun bucketsOf(
-        range: DateRange,
-        granularity: TimeGranularity,
-    ): List<Instant> {
-        val first = bucketStart(range.from, ReportingPeriodResolver.ZONE_ID, granularity)
-        val last = lastBucket(range, granularity)
-
-        if (last.isBefore(first)) return emptyList()
-
-        val buckets = mutableListOf<Instant>()
-        var cursor = first
-        while (!cursor.isAfter(last)) {
-            buckets += cursor.toInstant()
-            cursor = nextBucket(cursor, granularity)
-        }
-
-        return buckets
-    }
-
-    /** The bucket containing `range.to`, or the one before it when the window ends exactly on a boundary. */
-    private fun lastBucket(
-        range: DateRange,
-        granularity: TimeGranularity,
-    ): ZonedDateTime {
-        val endBucket = bucketStart(range.to, ReportingPeriodResolver.ZONE_ID, granularity)
-        return if (endBucket.toInstant() == range.to) previousBucket(endBucket, granularity) else endBucket
-    }
-
-    private fun bucketStart(
-        instant: Instant,
-        zone: ZoneId,
-        granularity: TimeGranularity,
-    ): ZonedDateTime =
-        when (granularity) {
-            // Whole-hour offsets make wall-clock truncation safe; going through the local date for
-            // days avoids inventing a midnight that does not exist on a DST transition.
-            TimeGranularity.HOUR -> instant.atZone(zone).truncatedTo(ChronoUnit.HOURS)
-            TimeGranularity.DAY -> instant.atZone(zone).toLocalDate().atStartOfDay(zone)
-        }
-
-    private fun nextBucket(
-        bucket: ZonedDateTime,
-        granularity: TimeGranularity,
-    ): ZonedDateTime =
-        when (granularity) {
-            TimeGranularity.HOUR -> bucket.plusHours(1)
-            TimeGranularity.DAY -> bucket.plusDays(1)
-        }
-
-    private fun previousBucket(
-        bucket: ZonedDateTime,
-        granularity: TimeGranularity,
-    ): ZonedDateTime =
-        when (granularity) {
-            TimeGranularity.HOUR -> bucket.minusHours(1)
-            TimeGranularity.DAY -> bucket.minusDays(1)
-        }
 
     private companion object {
         val EMPTY_SUMMARY = StatsSummary(pageViews = 0, visitors = 0, bounceRate = BigDecimal.ZERO, averageDurationMillis = BigDecimal.ZERO)

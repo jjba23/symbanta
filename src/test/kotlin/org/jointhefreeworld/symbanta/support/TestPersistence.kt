@@ -21,10 +21,15 @@ import org.jointhefreeworld.symbanta.feature.properties.adapter.outbound.persist
 import org.jointhefreeworld.symbanta.feature.properties.adapter.outbound.persistence.PropertyJpaRepository
 import org.jointhefreeworld.symbanta.feature.properties.port.outbound.PropertyRepositoryPort
 import org.jointhefreeworld.symbanta.feature.statistics.adapter.outbound.persistence.JpaAnalyticsQueryAdapter
+import org.jointhefreeworld.symbanta.feature.statistics.adapter.outbound.rollup.RollupAnalyticsQueryAdapter
+import org.jointhefreeworld.symbanta.feature.statistics.adapter.outbound.rollup.StatsRollupRefresher
 import org.jointhefreeworld.symbanta.feature.statistics.port.outbound.AnalyticsQueryPort
+import org.jointhefreeworld.symbanta.shared.adapter.outbound.time.SystemClockAdapter
+import org.jointhefreeworld.symbanta.shared.port.outbound.ClockPort
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.orm.jpa.JpaTransactionManager
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter
@@ -60,7 +65,13 @@ object TestPersistence {
 
     val userAccounts: UserAccountRepositoryPort get() = context.getBean(UserAccountRepositoryPort::class.java)
 
-    val analytics: AnalyticsQueryPort get() = context.getBean(AnalyticsQueryPort::class.java)
+    // Looked up by name: both analytics beans implement the same port, and this slice uses the
+    // default (interface) proxying, so the transactional adapter is a JDK proxy.
+    val analytics: AnalyticsQueryPort get() = context.getBean("analyticsQueryPort", AnalyticsQueryPort::class.java)
+
+    val rollupAnalytics: AnalyticsQueryPort get() = context.getBean("rollupAnalyticsQueryAdapter", AnalyticsQueryPort::class.java)
+
+    val rollupRefresher: StatsRollupRefresher get() = context.getBean("statsRollupRefresher", StatsRollupRefresher::class.java)
 
     val consoleLogs: ConsoleLogQueryPort get() = context.getBean(ConsoleLogQueryPort::class.java)
 }
@@ -116,6 +127,26 @@ class TestPersistenceConfig {
         properties: PropertyRepositoryPort,
         events: EventJpaRepository,
     ): AnalyticsQueryPort = JpaAnalyticsQueryAdapter(properties, events)
+
+    @Bean
+    fun namedParameterJdbcTemplate(dataSource: DataSource): NamedParameterJdbcTemplate = NamedParameterJdbcTemplate(dataSource)
+
+    @Bean
+    fun clockPort(): ClockPort = SystemClockAdapter()
+
+    @Bean
+    fun statsRollupRefresher(
+        jdbc: NamedParameterJdbcTemplate,
+        clock: ClockPort,
+        transactions: PlatformTransactionManager,
+    ): StatsRollupRefresher = StatsRollupRefresher(jdbc, clock, transactions)
+
+    @Bean
+    fun rollupAnalyticsQueryAdapter(
+        jdbc: NamedParameterJdbcTemplate,
+        properties: PropertyRepositoryPort,
+        refresher: StatsRollupRefresher,
+    ): RollupAnalyticsQueryAdapter = RollupAnalyticsQueryAdapter(jdbc, properties, refresher)
 
     @Bean
     fun consoleLogQueryPort(events: EventJpaRepository): ConsoleLogQueryPort = JpaConsoleLogAdapter(events)

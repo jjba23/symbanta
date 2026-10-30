@@ -13,7 +13,8 @@ import org.jointhefreeworld.symbanta.feature.events.adapter.outbound.persistence
 import org.jointhefreeworld.symbanta.feature.events.adapter.outbound.persistence.JpaEventStore
 import org.jointhefreeworld.symbanta.feature.events.port.outbound.EventStorePort
 import org.jointhefreeworld.symbanta.feature.statistics.adapter.inbound.web.StatsTimeseriesController
-import org.jointhefreeworld.symbanta.feature.statistics.adapter.outbound.persistence.JpaAnalyticsQueryAdapter
+import org.jointhefreeworld.symbanta.feature.statistics.adapter.outbound.rollup.RollupAnalyticsQueryAdapter
+import org.jointhefreeworld.symbanta.feature.statistics.adapter.outbound.rollup.StatsRollupRefresher
 import org.jointhefreeworld.symbanta.feature.statistics.port.inbound.GetTimeSeriesUseCase
 import org.jointhefreeworld.symbanta.feature.statistics.port.outbound.AnalyticsQueryPort
 import org.jointhefreeworld.symbanta.support.TestDatabase
@@ -45,7 +46,8 @@ class ApplicationContextSpec :
                     "--spring.datasource.password=${TestDatabase.password}",
                 ).use { context ->
                     // Ports resolve to the adapters WiringConfig registers, not to mocks.
-                    context.getBean(AnalyticsQueryPort::class.java).shouldBeInstanceOf<JpaAnalyticsQueryAdapter>()
+                    context.getBean(AnalyticsQueryPort::class.java).shouldBeInstanceOf<RollupAnalyticsQueryAdapter>()
+                    context.getBean(StatsRollupRefresher::class.java)
                     context.getBean(EventStorePort::class.java).shouldBeInstanceOf<JpaEventStore>()
                     context.getBean(GetTimeSeriesUseCase::class.java)
 

@@ -72,10 +72,15 @@ application:
     # Grace period a worker gives each batch to fill before flushing it, so a few thousand
     # events per second are not written as one transaction per event.
     linger-millis: 10
-  # Dashboard reads are full-window aggregates, so a repeated read inside this window is served
-  # from memory. Set to 0 to disable the cache and read the store on every call.
+  # Dashboard reads are served from the hourly and daily rollup tables; a repeated read inside this
+  # window is additionally served from memory. Set cache-ttl to 0 to read the store on every call.
   stats:
     cache-ttl: 15s
+    # Rollups are rebuilt in the background: whole hours as they complete, the current hour every
+    # refresh-interval. Reads trust them up to the last run and aggregate the remainder from events.
+    rollup:
+      enabled: true
+      refresh-interval: 15s
   user-seeder:
     users: []
       # - username: admin

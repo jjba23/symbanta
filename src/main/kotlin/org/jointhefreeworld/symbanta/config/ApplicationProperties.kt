@@ -36,6 +36,14 @@ data class StatisticsCacheConfig(
     val cacheTtl: Duration = Duration.ofSeconds(15),
 )
 
+@ConfigurationProperties(prefix = "application.stats.rollup")
+data class StatisticsRollupConfig(
+    /** When false, dashboard reads aggregate the event log directly and no rollups are built. */
+    val enabled: Boolean = true,
+    /** How often the current hour is rebuilt, i.e. how stale the dashboard's newest data can be. */
+    val refreshInterval: Duration = Duration.ofSeconds(15),
+)
+
 @ConfigurationProperties(prefix = "application.property-seeder")
 data class PropertySeederConfig(
     val properties: Set<PropertySeederConfigItem> = setOf(),

@@ -33,7 +33,9 @@ Symbanta is organised as a hexagonal (ports and adapters) application. Dependenc
 Everything is grouped by feature, and inside a feature by the hexagonal role:
 
 - ~events~: ingestion (validate and enqueue), the durable writer, the bounded queue, geolocation.
-- ~statistics~: summary, time series, routes, screen sizes, user agents, events and countries; the read-side query port and its JPA adapter.
+- ~statistics~: summary, time series, routes, screen sizes, user agents, events and countries; the
+  read-side query port with two adapters — one answering from the hourly and daily rollup tables, one
+  aggregating the event log directly — plus the background refresher that maintains them.
 - ~properties~, ~eventtypes~, ~auth~, ~console~, ~telemetry~: one feature per domain concern, each with its own ports, services and adapters.
 - ~shared~: the kernel every feature may depend on — =PropertyId=, =EventId=, =DateRange=, =TimePeriod=, the reporting period resolver, the exceptions and the clock port.
 - Composition root: ~config/WiringConfig~ is the only place where ports are bound to implementations. Replacing PostgreSQL, or the in-process queue for a broker, is a change confined to that file.
@@ -46,7 +48,7 @@ The server backend is implemented using modern infrastructure designed for high 
 
 - Asynchronous Event Queue: Fire-and-forget ingestion over a bounded Kotlin Coroutines queue (a fixed worker pool on =Dispatchers.IO=). The API always answers =202 Accepted= immediately while database writes happen off the HTTP thread pool. Workers coalesce whatever is queued into one batched write (Hibernate JDBC batching) per flush, so throughput is bound by batches rather than events. When the burst exceeds the queue capacity the excess is dropped with a rate-limited warning (and a counter) instead of exhausting the JDBC pool or the heap.
 
-- Storage Layer: PostgreSQL accessed through Spring Data JPA (Hibernate), with native =jsonb= document support for extensible payload properties, managed strictly via Flyway schema migrations. No hand-written JDBC: entities map the tables, Spring Data repositories provide the CRUD, and the dashboard aggregates are JPQL queries. The only native SQL left is the session active-duration window function (`LAG`), which JPQL cannot express.
+- Storage Layer: PostgreSQL accessed through Spring Data JPA (Hibernate), with native =jsonb= document support for extensible payload properties, managed strictly via Flyway schema migrations. Entities map the tables and Spring Data repositories provide the CRUD. Dashboard reads are native SQL: window functions (`LAG`) over the event log, and the rollup pipeline (~StatsRollupRefresher~, ~RollupAnalyticsQueryAdapter~) over =JdbcTemplate=, so its bucket boundaries and session stitching stay explicit.
 
 - REST API Runtime Environment is Java 25 & Kotlin 2.4 built upon Spring Boot 4.1.
 
@@ -262,6 +264,11 @@ application:
   # How long a stats read may be served from memory (0 = read the store on every call)
   stats:
     cache-ttl: 15s
+    # Hourly and daily rollups: how often the hour in progress is rebuilt, and whether dashboard
+    # reads use them at all (false aggregates the event log per request)
+    rollup:
+      enabled: true
+      refresh-interval: 15s
 #+end_src
 
 ------------
@@ -300,7 +307,7 @@ clean:
 
 Ensure your PostgreSQL instance is running and accessible via your Spring datasource environment variables !
 
-Database migrations for properties, events, event_types and app_users will execute automatically on application boot via Flyway !
+Database migrations for properties, events, event_types, app_users and the analytics rollup tables execute automatically on application boot via Flyway !
 
 The persistence specs use Testcontainers. If Docker is not available but Podman is, point
 Testcontainers at the Podman socket:
@@ -333,124 +340,88 @@ write throughput is visible in =events= table growth and in the JVM pipeline ben
 numbers of the machine you deploy on: absolute values are machine dependent, regressions between two
 revisions on the same machine are what matter.
 
-** Measured baseline
+** Current measurements
 
-Local run: 12 vCPU, Java 25, PostgreSQL 16 (Podman), API and load generator on the same machine.
+Local run: 12 vCPU, Java 25, PostgreSQL 17 (Podman), API and load generator on the same machine.
 Treat these as a regression baseline, not as a capacity promise.
 
-| Benchmark                                          | Result                                                  |
-|----------------------------------------------------+---------------------------------------------------------|
-| =UserAgentParser.parse= (desktop UA)               | 767 ns/op (1.3M ops/s)                                  |
-| =ScreenSizeMapper.mapToBucket=                     | 8.5 ns/op (118M ops/s)                                  |
-| =ReportingPeriodResolver.resolve= (CUSTOM window)  | 447 ns/op (2.2M ops/s)                                  |
-| Ingestion request path (validate + enqueue)        | 751 ns/event (1.33M events/s)                           |
-| Worker batch write, in-memory store (500/batch)    | 70 ns/event (14.3M events/s)                            |
-| =POST /v1/events/register=, 8 connections          | 2.2k req/s, p50 3.0 ms, p95 6.9 ms, p99 10.6 ms, 0 errors |
-| =POST /v1/events/register=, 32 connections         | 3.6k req/s, p50 7.6 ms, p95 18 ms, p99 25 ms, 0 errors   |
-| Durable writer, batched, 32 connections            | 58,865 events stored, 0 dropped, 0 failed, backlog 0     |
-| Dashboard queries, 8 connections, 7 endpoints      | 31 iterations/s, p95 419 ms                             |
+Pure domain services and the request path, with no database and no network:
 
-Ingestion used to write one row per event, which topped out around 3k events/s on this machine: at
-~3.6k accepted events/s the writer fell behind and the bounded queue started dropping. The worker now
-coalesces the queue into one multi-row =INSERT= per flush, so a burst of events costs a handful of
-round trips instead of one per event. Re-running the same load after the change shows the whole burst
-accepted and durably written with zero drops:
+| Benchmark                                         | Result                        |
+|---------------------------------------------------+-------------------------------|
+| =UserAgentParser.parse= (desktop UA)              | 767 ns/op (1.3M ops/s)        |
+| =ScreenSizeMapper.mapToBucket=                    | 8.5 ns/op (118M ops/s)        |
+| =ReportingPeriodResolver.resolve= (CUSTOM window) | 447 ns/op (2.2M ops/s)        |
+| Ingestion request path (validate + enqueue)       | 751 ns/event (1.33M events/s) |
+| Worker batch write, in-memory store (500/batch)   | 70 ns/event (14.3M events/s)  |
 
-- 8 connections, 10 s: 22,458 events accepted, all 22,458 stored, =dropped= 0, =failed= 0.
-- 32 connections, 10 s: 58,865 events accepted at 3.6k req/s, all stored, =dropped= 0, and
-  =symbanta_ingestion_queue_backlog= returned to 0 within a second of the load stopping.
+Ingestion over HTTP, writing to PostgreSQL:
 
-HTTP keeps answering =202= in a few milliseconds meanwhile: no connection-pool collapse and no
-unbounded memory growth. An earlier unbounded variant of this dispatcher did collapse under the same
-load (JDBC pool exhausted, requests timing out), which is why the queue stays bounded and
-configurable through =application.ingestion.queue-capacity= / =worker-count= / =max-batch-size= /
-=linger-millis=.
+| Benchmark                                  | Result                                                    |
+|--------------------------------------------+-----------------------------------------------------------|
+| =POST /v1/events/register=, 8 connections  | 4.5k req/s, p50 1.5 ms, p95 3.4 ms, p99 5.0 ms, 0 errors  |
+| =POST /v1/events/register=, 32 connections | 5.0k req/s, p50 5.8 ms, p95 12.5 ms, p99 16.8 ms, 0 errors |
+| Durability, 8 and 32 connections, 10 s each | 94,385 events stored, 0 dropped, 0 failed                |
 
-These numbers are from the Spring Data JPA persistence layer. Compared with the previous hand-written
-JDBC adapter, accepted HTTP throughput on the same 8-connection run drops from ~3.2k to ~2.2k req/s,
-the cost of Hibernate entity management per event; durability, zero drops and the throughput at 32
-connections (~3.6k req/s accepted) are unchanged.
+Dashboard reads, with =events= holding 2,000,000 rows across 400,000 sessions over seven days:
 
-** Profiling pass: what moved, and what did not
+| Measurement (=LAST_7_DAYS=)                    | Result                                                   |
+|------------------------------------------------+----------------------------------------------------------|
+| Dashboard sweep of the 7 endpoints, first load | 6.7 s total, 0.5-1.5 s per endpoint                       |
+| The same sweep inside the cache TTL            | 25 ms                                                     |
+| 8 connections for 20 s, default configuration  | 5,084 req/s, p50 0.8 ms, p95 2.4 ms, p99 3.7 ms, 0 errors |
+| 8 connections for 20 s, =cache-ttl: 0=         | 3 req/s, p50 2.5 s, p95 4.0 s                             |
 
-A JFR recording of both the request threads and the ingestion workers, plus ~EXPLAIN (ANALYZE)=
-on the dashboard queries, showed three things worth changing. Measurements below are from this
-machine (12 vCPU, Java 25, PostgreSQL 17 in Podman, API and load generator on the same host); the
-=events= table held 1.9M rows by the time the read numbers were taken, which is why they are much
-larger than the 73k-row baseline above.
+A first load pays for aggregating the window from the rollup tables; reads inside the cache TTL, and
+the reads of every other user or tab, are answered from memory.
 
-1. *The writer was doing one transaction per event.* With ~4.9k accepted events/s the queue was
-   being flushed in batches of ~1.5, so the commit, not the row, dominated. Workers now hold the
-   batch open for =application.ingestion.linger-millis= (default 10 ms) before writing it. Under
-   the same overload (six generators, ~13k req/s offered for 15 s):
+** Pre-aggregated dashboard reads
 
-| Measurement (15 s)             | Before linger | After linger |
-|--------------------------------+---------------+--------------|
-| Events durably written         | 114,590       | 195,377      |
-| Events dropped (queue full)    | 98,893        | 0            |
-| Flushes (transactions)         | 273           | 1,695        |
-| Average flush                  | 440 ms        | 60 ms        |
-| Database time per event        | 1.01 ms       | 0.52 ms      |
+Dashboard endpoints do not aggregate the event log. Two tables hold the same facts one bucket at a
+time, maintained by ~StatsRollupRefresher~:
 
-2. *The shipped configuration logged every request at DEBUG.* ~logback-spring.xml= keeps the root at
-   INFO, but ~application.yaml= raised =org.springframework.web= and =org.springframework.security=
-   to DEBUG, which is several lines per request: 14.7% of the HTTP-thread samples in the JFR
-   recording were inside the logging framework. Both are back at INFO; an A/B run of the same 8
-   connections moved from 4.7k to 4.9k req/s, and the log volume drops by an order of magnitude.
-   Raise them per environment when debugging.
+- =stats_session_bucket=: one row per session per =hour= and per =day=, with event and page-view
+  counts plus the active time measured between consecutive events inside that bucket.
+- =stats_dimension_bucket=: one row per session per bucket per dimension (=route=, =country=,
+  =screen=, =user_agent=, =event=).
 
-3. *The dashboard summary read the same window twice.* Page views and visitors came from one query,
-   bounce rate and average duration from a second one that paired each event with the previous event
-   in its session. Both now come from a single pass over the window (=sessionSummary= in
-   ~EventJpaRepository~): 5.9 s → 2.4 s at 1.94M events, with identical page views, visitors, bounce
-   rate and average duration (checked against the old pair of queries on the same data).
+Rows keep the session id instead of being reduced to a count, because visitors are *distinct*
+sessions: a tab stays active across many buckets, so summing per-bucket counts would count it twice.
+With the session key present, a bucket can still be aggregated exactly — page views sum, visitors are
+counted distinct, and the active time of a session that spans buckets is stitched back together with
+=LAG= at read time.
 
-Measured and rejected, so they are not in the schema or the configuration:
+The refresher rebuilds the whole hours that have completed, rebuilds the hour in progress on every
+tick (=application.stats.rollup.refresh-interval=, default =15s=), and derives the day rows from the
+hour rows. A run is one transaction, so a bucket is never observed half-built, and it advances a
+coverage watermark (=stats_rollup_state=) saying how far the tables are valid. Buckets are rebuilt
+rather than patched, so an event that commits after its hour was rolled up is picked up by the next
+rebuild of that hour.
 
-- A covering index ~(property_id, created_at) INCLUDE (session_id, event_name, ...)~: the planner
-  keeps the sequential scan because a =LAST_7_DAYS= window covers the whole table, query times were
-  unchanged, and the index adds 151 MB plus write work.
-- ~work_mem= at 128 MB: the sorts moved into memory but the queries got slower, not faster.
-- Dropping the indexes no query uses (GIN on =props=, =(session_id, created_at)=, =(event_name)=):
-  insert throughput unchanged (8.2k vs 8.3k rows/s), confirming that commits, not index maintenance,
-  bound the writer on this host.
-- One ingestion worker instead of eight: 2.7k events/s against 7.6k, because one connection cannot
-  keep the storage busy.
+Reads are split by ~RollupWindow~ into four contiguous slices: whole days come from day rows, the
+rest of the covered window from hour rows, and the event log answers the minutes before the first
+whole hour plus anything after the watermark. That is what keeps windows that do not start on the
+hour exact (a =LAST_24_HOURS= window starts at, say, 10:37), and what lets a deployment with no
+rollups yet answer correctly: with no coverage, everything is read from the event log.
 
-What is left: every dashboard endpoint is still a full-window aggregation. At 1.9M events one
-=LAST_7_DAYS= read costs 1.9-4.0 s per endpoint and a dashboard load asks for seven of them, and no
-index helps while the window contains most of the table. The cache below makes repeats cheap but
-does not make the first load cheap; pre-aggregation (hourly or daily rollups per property) is what
-would, and it is the next step.
+- Rollups are switchable: =application.stats.rollup.enabled= (default =true=; =false= aggregates the
+  event log per request and stops building rollups).
+- Both adapters are pinned by the same contract: ~RollupAnalyticsQueryAdapter~ runs the full
+  ~AnalyticsQueryPortContract~, and a differential spec compares it with the direct adapter over
+  randomised sessions, tabs spanning hours and local midnight, and windows that start and end
+  mid-hour.
 
 ** Caching dashboard reads
 
-A dashboard load asks for seven aggregates over the same application and window, and every refresh
-repeats all seven. =CachingStatisticsQueryService= therefore sits in front of the statistics use
-cases and answers a repeat from memory:
+On top of the rollups, =CachingStatisticsQueryService= answers a repeated read from memory:
 
 - It is keyed by view, application and period, and a value is reused for at most
   =application.stats.cache-ttl= after it was computed (default =15s=, =0= disables it). The window
-  reported in a cached response is the one it was computed with, so the freshness loss is bounded
-  by the TTL and visible in the payload.
-- It collapses concurrent first reads: one request computes a key and the rest wait for that
-  answer. Without this, eight browsers opening a dashboard at once each ran the same full-window
-  aggregation (measured: p95 4.4 s and 8 req/s, against p95 2.6 ms and 4.7k req/s with it).
+  reported in a cached response is the one it was computed with, so the freshness loss is bounded by
+  the TTL and visible in the payload.
+- It collapses concurrent first reads: one request computes a key and the rest wait for that answer.
 - It is observable: =symbanta_stats_cache_hits_total=, =symbanta_stats_cache_misses_total= and
   =symbanta_stats_cache_entries=.
-
-Measured on 1M events / 200k sessions (PostgreSQL 17 in Podman, =LAST_7_DAYS=, same machine):
-
-| Measurement                                   | =cache-ttl: 0=                 | =cache-ttl: 15s=               |
-|-----------------------------------------------+--------------------------------+--------------------------------|
-| Dashboard sweep of the 7 endpoints, first load | 9.0 s                          | 9.9 s                          |
-| Same sweep again inside the TTL                | 9.0 s                          | 0.03 s                         |
-| 8 connections, 10 s                            | 3 req/s, p50 3.0 s, p95 3.7 s  | 4.7k req/s, p50 1.0 ms, p95 2.6 ms |
-| Reads answered without touching the store      | 0                              | 102,510 of 102,524             |
-
-The first load is unchanged by design: a cold read still scans the window, and a refresh slower
-than the TTL sees no benefit. What the cache buys is that several users, tabs or a fast refresh do
-not repeat work — and that a cold burst costs one scan per key instead of one per request.
 
 ** Testing outbound adapters
 
@@ -459,9 +430,10 @@ The analytics outbound ports have reusable contract suites:
 - ~AnalyticsQueryPortContract~ (statistics) and ~EventStorePortContract~ (events) live next to their
   ports under ~src/test/kotlin~ and take a small fixture that creates the adapter, seeds a property
   and resets state.
-- The JPA specs extend them, so aggregation, ordering, window and batch semantics are identical for
-  every adapter and a future implementation cannot silently diverge. Its own spec only supplies the
-  fixture plus adapter-specific assertions (columns, JSON mapping).
+- Both analytics adapters extend ~AnalyticsQueryPortContract~ (the rollup one rolls its seeded
+  events up first, the JPA one reads them back through the entity layer), so aggregation, ordering
+  and window semantics cannot silently diverge between them. A differential spec additionally
+  compares the two on randomised traffic.
 - ~support/TestPersistence~ boots a minimal JPA context (datasource, entity manager, transactions,
   repositories) against the Testcontainers database, so the specs exercise the same Spring Data
   proxies and `@Transactional` boundaries as the running application.
