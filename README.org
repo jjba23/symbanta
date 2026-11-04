@@ -5,6 +5,9 @@
 
 [[https://jointhefreeworld.org/ggg/dist/license-mit.svg]] [[https://img.shields.io/badge/CI-Byggsteg%20%7C%20GitHub-2ea44f.svg]]
 
+#+attr_html: :width 160 :alt Symbanta logo
+[[file:logo.svg]]
+
 Symbanta  is a  privacy-friendly, free and open-source software analytics platform.
 
 It tries to inspire a return to what measurement should be: tracking *what happened so as to improve user experience and reliability*, not for profit and selling customized ads to people.
@@ -56,7 +59,6 @@ The server backend is implemented using modern infrastructure designed for high 
 
 -----------------------------
 
-
 * Script Configuration Attributes
 
 | Attribute       | Purpose                                                       | Default Value                         |
@@ -88,7 +90,6 @@ To instrument a document or web application, include the freedom-respecting tele
 - LucidPlan: https://codeberg.org/jjba23/lucidplan
 
 -----
-
 
 * API Specification Summary
 
@@ -463,7 +464,6 @@ Our core principle is simple: *AI should assist human creativity and problem-sol
 While tools like Large Language Models (LLMs) and interactive chatbots can be beneficial for reviewing, refactoring small functions, or acting as a sounding board, they should be used with moderation.
 
 We require a human in the loop for all contributions.
-
 
 -----------------------
 
